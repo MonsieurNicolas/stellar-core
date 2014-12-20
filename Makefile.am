@@ -24,7 +24,7 @@ FMT_SRCS = src/overlay/Floodgate.cpp src/overlay/PeerDoor.cpp                   
 	src/process/ProcessTests.cpp src/history/HistoryMaster.cpp                  \
 	src/history/HistoryTests.cpp src/overlay/OverlayTests.cpp                   \
 	src/simulation/Simulation.cpp src/simulation/CycleTests.cpp                 \
-	src/util/Timer.cpp
+	src/util/Timer.cpp src/util/DecimalTests.cpp
 
 FMT_HDRS = src/clf/BucketList.h src/clf/CanonicalLedgerForm.h src/clf/CLF.h     \
 	src/clf/CLFDelta.h src/clf/CLFGateway.h src/crypto/EdKeyPair.h              \
@@ -64,6 +64,7 @@ bin_stellard_SOURCES = $(FMT_SRCS) \
 
 bin_stellard_CPPFLAGS = -I$(top_srcdir)/src \
                         -I$(builddir)/src \
+                        -I$(srcdir)/src/lib/decNumber \
                         -I$(srcdir)/src/lib/autocheck/include \
                         -I$(srcdir)/src/lib/util \
                         -I$(srcdir)/src/lib/asio/include -DASIO_STANDALONE

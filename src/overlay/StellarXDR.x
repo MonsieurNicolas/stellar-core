@@ -13,6 +13,7 @@ namespace stellarxdr {
 // messages
 typedef opaque uint256[32];
 typedef opaque uint160[20];
+typedef opaque decimal128[16];
 typedef unsigned hyper uint64;
 typedef unsigned uint32;
 
