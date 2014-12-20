@@ -9,6 +9,12 @@
 
 extern "C"
 {
+#define DECPRINT 0
+#if XDRPP_WORDS_BIGENDIAN
+#define DECLITEND 0
+#else
+#define DECLITEND 1
+#endif
 #include <decQuad.h>
 }
 
