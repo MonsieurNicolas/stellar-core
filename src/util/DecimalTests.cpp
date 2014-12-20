@@ -10,7 +10,7 @@
 
 using namespace stellar;
 
-TEST_CASE("DecimalAdd", "[decimal]")
+TEST_CASE("Decimal misc smoketest", "[decimal]")
 {
     DecContext ctx;
     DecQuad a = ctx.fromString("100.5");
@@ -29,4 +29,14 @@ TEST_CASE("DecimalAdd", "[decimal]")
         c = ctx.mul(c, DecQuad(5));
         LOG(DEBUG) << "Decimal: *= 5 --> " << c.toString();
     }
+}
+
+TEST_CASE("Decimal rounding throws", "[decimal]")
+{
+    DecContext ctx;
+    DecQuad a = ctx.fromString("100.5");
+    CHECK(ctx.div(a, DecQuad(3)).toString() == "33.5");
+
+    a = ctx.fromString("123.5");
+    CHECK_THROWS(ctx.div(a, DecQuad(3)));
 }

@@ -9,7 +9,6 @@
 
 extern "C"
 {
-#define DECEXTFLAG 0
 #include <decQuad.h>
 }
 
