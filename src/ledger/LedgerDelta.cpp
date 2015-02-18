@@ -101,31 +101,125 @@ namespace stellar
 
     xdr::msg_ptr LedgerDelta::getTransactionMeta() const
     {
-        TransactionMeta tm;
-        
-        CLFEntryBase::_entry_t et;
+        LedgerDelta::MetaHelper me(*this);
+        return xdr::xdr_to_msg(me);
+    }
 
-        et.type(LIVEENTRY);
+    Constexpr const std::size_t LedgerDelta::MetaHelper::size() const
+    {
+        return mLedgerDelta.mNew.size() + mLedgerDelta.mMod.size() + mLedgerDelta.mDelete.size();
+    }
 
-        for (auto const &k : mNew)
+    void LedgerDelta::MetaHelper::check_size(uint32_t i) const
+    {
+        abort(); // not implemented
+    }
+
+    void LedgerDelta::MetaHelper::resize(uint32_t i)
+    {
+        abort(); // not implemented
+    }
+
+    LedgerDelta::MetaHelper::value_type &LedgerDelta::MetaHelper::extend_at(uint32_t i)
+    {
+        abort(); // not implemented
+        return CLFEntryBase();
+    }
+
+    LedgerDelta::MetaHelper::ValueIterator LedgerDelta::MetaHelper::begin() const
+    {
+        return ValueIterator(*this, true);
+    }
+
+    LedgerDelta::MetaHelper::ValueIterator LedgerDelta::MetaHelper::end() const
+    {
+        return ValueIterator(*this, false);
+    }
+
+    LedgerDelta::MetaHelper::ValueIterator::ValueIterator(LedgerDelta::MetaHelper const& me, bool begin)
+        : mLedgerDelta(me.mLedgerDelta)
+    {
+        if (begin)
         {
-            et.liveEntry() = k.second->mEntry;
-            tm.entries.push_back(CLFEntryBase(et));
+            mIter = mLedgerDelta.mNew.begin();
+            mState = newNodes;
         }
-        for (auto const &k : mMod)
+        else
         {
-            et.liveEntry() = k.second->mEntry;
-            tm.entries.push_back(CLFEntryBase(et));
+            mState = done;
         }
+    }
 
-        et.type(DEADENTRY);
-
-        for (auto const &k : mDelete)
+    LedgerDelta::MetaHelper::ValueIterator& LedgerDelta::MetaHelper::ValueIterator::operator++()
+    {
+        switch (mState)
         {
-            et.deadEntry() = k;
-            tm.entries.push_back(CLFEntryBase(et));
+        case newNodes:
+            if (mIter != mLedgerDelta.mNew.end())
+            {
+                mIter++;
+                if (mIter != mLedgerDelta.mNew.end())
+                    return *this;
+            }
+            mIter = mLedgerDelta.mMod.begin();
+            mState = modNodes;
+        case modNodes:
+            if (mIter != mLedgerDelta.mMod.end())
+            {
+                mIter++;
+                if (mIter != mLedgerDelta.mMod.end())
+                    return *this;
+            }
+            mDelIter = mLedgerDelta.mDelete.begin();
+            mState = delNodes;
+        case delNodes:
+            if (mDelIter != mLedgerDelta.mDelete.end())
+            {
+                mDelIter++;
+                if (mDelIter != mLedgerDelta.mDelete.end())
+                    return *this;
+            }
+            mState = done;
+        default:
+            return *this;
         }
+    }
 
-        return xdr::xdr_to_msg(tm);
+    bool LedgerDelta::MetaHelper::ValueIterator::operator==(const LedgerDelta::MetaHelper::ValueIterator& rhs) const
+    {
+        if (this == &rhs)
+            return true;
+
+        return mState == rhs.mState &&
+            (
+            (mState == done) ||
+            (mState == delNodes && mDelIter == rhs.mDelIter) ||
+            (mState != delNodes && mIter == rhs.mIter)
+            );
+    }
+
+    bool LedgerDelta::MetaHelper::ValueIterator::operator!=(const LedgerDelta::MetaHelper::ValueIterator& rhs) const
+    {
+        return !(*this == rhs);
+    }
+
+    LedgerDelta::MetaHelper::value_type const& LedgerDelta::MetaHelper::ValueIterator::operator*()
+    {
+        // copies are still occuring but can be avoided by splitting
+        // the live from dead entries (thus only using LedgerEntry types)
+        switch (mState)
+        {
+        case newNodes:
+        case modNodes:
+            mCurObject.entry.type(LIVEENTRY);
+            mCurObject.entry.liveEntry() = mIter->second->mEntry;
+            return mCurObject;
+        case delNodes:
+            mCurObject.entry.type(DEADENTRY);
+            mCurObject.entry.deadEntry() = *mDelIter;
+            return mCurObject;
+        default:
+            throw std::out_of_range("could not read past last element");
+        }
     }
 }

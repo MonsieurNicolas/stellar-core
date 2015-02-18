@@ -317,6 +317,7 @@ void TransactionFrame::storeTransaction(LedgerMaster &ledgerMaster, LedgerDelta 
 
     xdr::msg_ptr txMeta(delta.getTransactionMeta());
 
+
     std::string meta = base64::encode(
         reinterpret_cast<const unsigned char *>(txMeta->raw_data()),
         txMeta->raw_size());
