@@ -99,7 +99,33 @@ namespace stellar
         }
     }
 
-    //////////////////////////////////////////////////////////////////////////
+    xdr::msg_ptr LedgerDelta::getTransactionMeta() const
+    {
+        TransactionMeta tm;
+        
+        CLFEntryBase::_entry_t et;
 
-    
+        et.type(LIVEENTRY);
+
+        for (auto const &k : mNew)
+        {
+            et.liveEntry() = k.second->mEntry;
+            tm.entries.push_back(CLFEntryBase(et));
+        }
+        for (auto const &k : mMod)
+        {
+            et.liveEntry() = k.second->mEntry;
+            tm.entries.push_back(CLFEntryBase(et));
+        }
+
+        et.type(DEADENTRY);
+
+        for (auto const &k : mDelete)
+        {
+            et.deadEntry() = k;
+            tm.entries.push_back(CLFEntryBase(et));
+        }
+
+        return xdr::xdr_to_msg(tm);
+    }
 }
