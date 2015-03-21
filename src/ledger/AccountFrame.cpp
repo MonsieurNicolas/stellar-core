@@ -236,9 +236,7 @@ AccountFrame::storeUpdate(LedgerDelta& delta, Database& db, bool insert) const
     }
     else
     {
-        sql = std::string("UPDATE Accounts SET balance = :v1, seqNum = :v2, numSubEntries = :v3, \
-                inflationDest = :v4, thresholds = :v5,                  \
-                flags = :v6 WHERE accountID = :id");
+        sql = std::string("UPDATE Accounts SET balance = :v1 WHERE accountID = :id");
     }
 
     auto prep = db.getPreparedStatement(sql);
@@ -261,11 +259,14 @@ AccountFrame::storeUpdate(LedgerDelta& delta, Database& db, bool insert) const
         soci::statement& st = prep.statement();
         st.exchange(use(base58ID, "id"));
         st.exchange(use(mAccountEntry.balance, "v1"));
-        st.exchange(use(mAccountEntry.seqNum, "v2"));
-        st.exchange(use(mAccountEntry.numSubEntries, "v3"));
-        st.exchange(use(inflationDestStr, inflation_ind, "v4"));
-        st.exchange(use(thresholds, "v5"));
-        st.exchange(use(mAccountEntry.flags, "v6"));
+        if (insert)
+        {
+            st.exchange(use(mAccountEntry.seqNum, "v2"));
+            st.exchange(use(mAccountEntry.numSubEntries, "v3"));
+            st.exchange(use(inflationDestStr, inflation_ind, "v4"));
+            st.exchange(use(thresholds, "v5"));
+            st.exchange(use(mAccountEntry.flags, "v6"));
+        }
         st.define_and_bind();
         {
             auto timer = insert ? db.getInsertTimer("account")
