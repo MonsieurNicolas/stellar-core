@@ -110,7 +110,7 @@ bool
 AccountFrame::loadAccount(const uint256& accountID, AccountFrame& retAcc,
                           Database& db, bool withSig)
 {
-    std::string base58ID = toBase58Check(VER_ACCOUNT_ID, accountID);
+    std::string base58ID = binToHex(accountID); //  toBase58Check(VER_ACCOUNT_ID, accountID);
     std::string publicKey, inflationDest, creditAuthKey;
     std::string thresholds;
     soci::indicator inflationDestInd, thresholdsInd;
@@ -181,7 +181,7 @@ AccountFrame::loadAccount(const uint256& accountID, AccountFrame& retAcc,
 bool
 AccountFrame::exists(Database& db, LedgerKey const& key)
 {
-    std::string base58ID =
+    std::string base58ID = 
         toBase58Check(VER_ACCOUNT_ID, key.account().accountID);
     int exists = 0;
     {
