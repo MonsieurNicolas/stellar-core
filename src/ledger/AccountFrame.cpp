@@ -18,7 +18,7 @@ namespace stellar
 const char* AccountFrame::kSQLCreateStatement1 =
     "CREATE TABLE Accounts"
     "("
-    "accountID       VARCHAR(51)  PRIMARY KEY,"
+    "accountID       CHAR(64)     PRIMARY KEY,"
     "balance         BIGINT       NOT NULL,"
     "seqNum          BIGINT       NOT NULL,"
     "numSubEntries   INT          NOT NULL CHECK (numSubEntries >= 0),"
@@ -223,8 +223,8 @@ AccountFrame::storeDelete(LedgerDelta& delta, Database& db,
 void
 AccountFrame::storeUpdate(LedgerDelta& delta, Database& db, bool insert) const
 {
-    std::string base58ID =
-        toBase58Check(VER_ACCOUNT_ID, mAccountEntry.accountID);
+    std::string base58ID = binToHex(mAccountEntry.accountID);
+        //toBase58Check(VER_ACCOUNT_ID, mAccountEntry.accountID);
 
     std::string sql;
 
