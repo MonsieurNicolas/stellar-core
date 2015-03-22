@@ -142,6 +142,7 @@ TEST_CASE("paymentSim", "[paymentdbtest]")
                     LOG(INFO) << "Done : " << count << " @ " << rate << " accounts/second";
                 }
             }
+            REQUIRE(AccountFrame::loadAccount(root.getPublicKey(), rootAccount, app->getDatabase()));
             memcpy(&account.getAccount().accountID, &count, sizeof(count));
             uint32_t data = rand();
             memcpy(&account.getAccount().accountID[4], &data, sizeof(data));
