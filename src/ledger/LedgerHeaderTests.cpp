@@ -142,13 +142,16 @@ TEST_CASE("paymentSim", "[paymentdbtest]")
                     LOG(INFO) << "Done : " << count << " @ " << rate << " accounts/second";
                 }
             }
-            // read (D)
-            REQUIRE(AccountFrame::loadAccount(root.getPublicKey(), rootAccount, app->getDatabase()));
-            memcpy(&account.getAccount().accountID, &count, sizeof(count));
-            uint32_t data = rand();
-            memcpy(&account.getAccount().accountID[4], &data, sizeof(data));
-            account.getAccount().balance = rand();
-            account.storeAdd(delta, app->getDatabase());
+            {
+                soci::transaction tx2(app->getDatabase().getSession());
+                // read (D)
+                REQUIRE(AccountFrame::loadAccount(root.getPublicKey(), rootAccount, app->getDatabase()));
+                memcpy(&account.getAccount().accountID, &count, sizeof(count));
+                uint32_t data = rand();
+                memcpy(&account.getAccount().accountID[4], &data, sizeof(data));
+                account.getAccount().balance = rand();
+                account.storeAdd(delta, app->getDatabase());
+            }
             // read (E)
             REQUIRE(AccountFrame::loadAccount(root.getPublicKey(), rootAccount, app->getDatabase()));
             // write (B)
