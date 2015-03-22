@@ -110,12 +110,15 @@ TEST_CASE("accountCreate", "[accountstress]")
 TEST_CASE("paymentSim", "[paymentdbtest]")
 {
 
-    Config cfg(getTestConfig(0, Config::TESTDB_TCP_LOCALHOST_POSTGRESQL));
+//    Config cfg(getTestConfig(0, Config::TESTDB_TCP_LOCALHOST_POSTGRESQL));
+    Config cfg(getTestConfig(0, Config::TESTDB_ON_DISK_SQLITE));
 
     cfg.REBUILD_DB = true;
     VirtualClock clock;
     Application::pointer app = Application::create(clock, cfg);
     app->start();
+
+    app->getDatabase().getSession() << "PRAGMA cache_size=-100000";
 
     AccountFrame account, rootAccount;
     SecretKey root = txtest::getRoot();
@@ -151,12 +154,15 @@ TEST_CASE("paymentSim", "[paymentdbtest]")
                 memcpy(&account.getAccount().accountID[4], &data, sizeof(data));
                 account.getAccount().balance = rand();
                 account.storeAdd(delta, app->getDatabase());
+                tx2.commit();
             }
             // read (E)
             REQUIRE(AccountFrame::loadAccount(root.getPublicKey(), rootAccount, app->getDatabase()));
             // write (B)
             rootAccount.getAccount().balance -= rand();
             rootAccount.storeChange(delta, app->getDatabase());
+            // read (G)
+            REQUIRE(AccountFrame::loadAccount(root.getPublicKey(), rootAccount, app->getDatabase()));
         }
         tx.commit();
     }
