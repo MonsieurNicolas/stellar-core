@@ -7,6 +7,7 @@
 namespace stellar
 {
 
+// Those are used by SCP and are persisted in history
 struct StellarBallotValue
 {
     Hash txSetHash;
@@ -14,12 +15,18 @@ struct StellarBallotValue
     uint32 baseFee;
 };
 
-struct StellarBallot
+union StellarBallot switch (int v)
 {
-    uint256 nodeID;
-    Signature signature;
-    StellarBallotValue value;
+case 0:
+    struct
+    {
+        uint256 nodeID;
+        Signature signature;
+        StellarBallotValue value;
+    } v0;
 };
+
+// StellarMessage definition
 
 struct Error
 {

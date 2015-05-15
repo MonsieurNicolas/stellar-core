@@ -29,6 +29,16 @@ struct LedgerHeader
 
     int32 baseFee;     // base fee per operation in stroops
     int32 baseReserve; // account base reserve in stroops
+
+    // version of the protocol used to compute this ledger
+    uint32 protocolVersion;
+
+    // reserved for future use
+    union switch(int v)
+    {
+    case 0:
+        void;
+    } ext;
 };
 
 /* Entries used to define the bucket list */
@@ -97,18 +107,39 @@ struct TransactionHistoryEntry
 {
     uint32 ledgerSeq;
     TransactionSet txSet;
+
+    // reserved for future use
+    union switch(int v)
+    {
+    case 0:
+        void;
+    } ext;
 };
 
 struct TransactionHistoryResultEntry
 {
     uint32 ledgerSeq;
     TransactionResultSet txResultSet;
+
+    // reserved for future use
+    union switch(int v)
+    {
+    case 0:
+        void;
+    } ext;
 };
 
 struct LedgerHeaderHistoryEntry
 {
     Hash hash;
     LedgerHeader header;
+
+    // reserved for future use
+    union switch(int v)
+    {
+    case 0:
+        void;
+    } ext;
 };
 
 // represents the meta in the transaction table history

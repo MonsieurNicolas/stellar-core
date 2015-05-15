@@ -184,7 +184,7 @@ Result: InflationResult
 struct Operation
 {
     // sourceAccount is the account used to run the operation
-    // if not set, the runtime defaults to "account" specified at
+    // if not set, the runtime defaults to "sourceAccount" specified at
     // the transaction level
     AccountID* sourceAccount;
 
@@ -266,13 +266,24 @@ struct Transaction
     Memo memo;
 
     Operation operations<100>;
+
+    // reserved for future use
+    union switch(int v)
+    {
+    case 0:
+        void;
+    } ext;
 };
 
 /* A TransactionEnvelope wraps a transaction with signatures. */
-struct TransactionEnvelope
+union TransactionEnvelope switch (int v)
 {
-    Transaction tx;
-    DecoratedSignature signatures<20>;
+case 0:
+    struct
+    {
+        Transaction tx;
+        DecoratedSignature signatures<20>;
+    } v0;
 };
 
 /* Operation Results section */
@@ -415,7 +426,7 @@ struct CreateOfferSuccessResult
     case CREATE_OFFER_CREATED:
     case CREATE_OFFER_UPDATED:
         OfferEntry offer;
-    default:
+    case CREATE_OFFER_DELETED:
         void;
     }
     offer;
@@ -610,5 +621,13 @@ struct TransactionResult
         void;
     }
     result;
+
+    // reserved for future use
+    union switch (int v)
+    {
+    default:
+        void;
+    }
+    ext;
 };
 }
