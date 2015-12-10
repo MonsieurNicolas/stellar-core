@@ -30,7 +30,7 @@ TEST_CASE("standalone", "[herder]")
 {
     SIMULATION_CREATE_NODE(0);
 
-    Config cfg(getTestConfig());
+    Config cfg(getTestConfig(1, Config::TESTDB_ON_DISK_SQLITE));
 
     cfg.NODE_SEED = v0SecretKey;
 
@@ -64,6 +64,7 @@ TEST_CASE("standalone", "[herder]")
         {
             stop = true;
 
+#if 0
             REQUIRE(app->getLedgerManager().getLastClosedLedgerNum() > 2);
 
             AccountFrame::pointer a1Account, b1Account;
@@ -71,19 +72,40 @@ TEST_CASE("standalone", "[herder]")
             b1Account = loadAccount(b1, *app);
             REQUIRE(a1Account->getBalance() == paymentAmount);
             REQUIRE(b1Account->getBalance() == paymentAmount);
+#endif
+            auto r = TransactionFrame::getTransactionHistoryResults(
+                app->getDatabase(), 3);
+            auto const& results = r.results;
+            REQUIRE(results.size() == 1);
         };
 
         auto setup = [&](asio::error_code const& error)
         {
+#if 0
             // create accounts
             TransactionFramePtr txFrameA1 = createCreateAccountTx(
                 networkID, root, a1, rootSeq++, paymentAmount);
             TransactionFramePtr txFrameA2 = createCreateAccountTx(
                 networkID, root, b1, rootSeq++, paymentAmount);
-
+#endif
+            // a tx that will fail but still collect a fee
+            Asset selling(ASSET_TYPE_NATIVE),
+                buying(ASSET_TYPE_CREDIT_ALPHANUM4);
+            auto& b = buying.alphaNum4();
+            b.assetCode[0] = 'X';
+            b.issuer = root.getPublicKey();
+            Price price;
+            price.n = 1;
+            price.d = 1;
+            auto txFrameF3 = manageOfferOp(networkID, 123, root, selling,
+                                           buying, price, 0, rootSeq++);
+#if 0
             REQUIRE(app->getHerder().recvTransaction(txFrameA1) ==
                     Herder::TX_STATUS_PENDING);
             REQUIRE(app->getHerder().recvTransaction(txFrameA2) ==
+                    Herder::TX_STATUS_PENDING);
+#endif
+            REQUIRE(app->getHerder().recvTransaction(txFrameF3) ==
                     Herder::TX_STATUS_PENDING);
         };
 
