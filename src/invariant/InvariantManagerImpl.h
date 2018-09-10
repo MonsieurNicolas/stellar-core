@@ -38,9 +38,6 @@ class InvariantManagerImpl : public InvariantManager
 
     virtual void checkOnOperationApply(Operation const& operation,
                                        OperationResult const& opres,
-                                       LedgerDelta const& delta) override;
-    virtual void checkOnOperationApply(Operation const& operation,
-                                       OperationResult const& opres,
                                        LedgerStateDelta const& lsDelta) override;
 
     virtual void checkOnBucketApply(std::shared_ptr<Bucket const> bucket,
