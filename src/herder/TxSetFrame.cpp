@@ -157,9 +157,11 @@ struct SurgeSorter
 };
 
 void
-TxSetFrame::surgePricingFilter(LedgerManager const& lm)
+TxSetFrame::surgePricingFilter(Application& app)
 {
-    size_t max = lm.getLastMaxTxSetSize();
+    LedgerState ls(app.getLedgerStateRoot());
+    auto header = ls.loadHeader();
+    size_t max = header.current().maxTxSetSize;
     if (mTransactions.size() > max)
     { // surge pricing in effect!
         CLOG(WARNING, "Herder")
@@ -170,7 +172,7 @@ TxSetFrame::surgePricingFilter(LedgerManager const& lm)
         for (auto& tx : mTransactions)
         {
             double fee = tx->getFee();
-            double minFee = lm.getLastTxFee();
+            double minFee = tx->getMinFee(header);
             double r = fee / minFee;
 
             double now = accountFeeMap[tx->getSourceID()];
