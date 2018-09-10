@@ -253,8 +253,6 @@ applyCheck(TransactionFramePtr tx, Application& app, bool checkSeqNum)
         lsTx.commit();
     }
 
-    // validates db state
-    app.getLedgerManager().checkDbState();
     --ls.loadHeader().current().ledgerSeq;
     ls.commit();
     return res;
