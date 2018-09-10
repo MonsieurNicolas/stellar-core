@@ -11,6 +11,7 @@
 #include "invariant/InvariantDoesNotHold.h"
 #include "invariant/InvariantManager.h"
 #include "ledger/LedgerDelta.h"
+#include "ledger/LedgerState.h"
 #include "ledger/LedgerTestUtils.h"
 #include "lib/catch.hpp"
 #include "main/Application.h"
@@ -64,6 +65,14 @@ class TestInvariant : public Invariant
     checkOnOperationApply(Operation const& operation,
                           OperationResult const& result,
                           LedgerDelta const& delta) override
+    {
+        return mShouldFail ? "fail" : "";
+    }
+
+    virtual std::string
+    checkOnOperationApply(Operation const& operation,
+                          OperationResult const& result,
+                          LedgerStateDelta const& lsDelta) override
     {
         return mShouldFail ? "fail" : "";
     }
@@ -192,16 +201,15 @@ TEST_CASE("onOperationApply fail/succeed", "[invariant]")
     Application::pointer app = createTestApplication(clock, cfg);
 
     OperationResult res;
-    LedgerHeader lh(app->getLedgerManager().getCurrentLedgerHeader());
-    LedgerDelta ld(lh, app->getDatabase());
-
     SECTION("Fail")
     {
         app->getInvariantManager().registerInvariant<TestInvariant>(0, true);
         app->getInvariantManager().enableInvariant(
             TestInvariant::toString(0, true));
+
+        LedgerState ls(app->getLedgerStateRoot());
         REQUIRE_THROWS_AS(
-            app->getInvariantManager().checkOnOperationApply({}, res, ld),
+            app->getInvariantManager().checkOnOperationApply({}, res, ls.getDelta()),
             InvariantDoesNotHold);
     }
     SECTION("Succeed")
@@ -209,7 +217,9 @@ TEST_CASE("onOperationApply fail/succeed", "[invariant]")
         app->getInvariantManager().registerInvariant<TestInvariant>(0, false);
         app->getInvariantManager().enableInvariant(
             TestInvariant::toString(0, false));
+
+        LedgerState ls(app->getLedgerStateRoot());
         REQUIRE_NOTHROW(
-            app->getInvariantManager().checkOnOperationApply({}, res, ld));
+            app->getInvariantManager().checkOnOperationApply({}, res, ls.getDelta()));
     }
 }
