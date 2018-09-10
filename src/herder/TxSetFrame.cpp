@@ -8,8 +8,12 @@
 #include "crypto/SHA.h"
 #include "database/Database.h"
 #include "ledger/LedgerManager.h"
+#include "ledger/LedgerState.h"
+#include "ledger/LedgerStateEntry.h"
+#include "ledger/LedgerStateHeader.h"
 #include "main/Application.h"
 #include "main/Config.h"
+#include "transactions/TransactionUtils.h"
 #include "util/Logging.h"
 #include "util/XDROperators.h"
 #include "xdrpp/marshal.h"
@@ -155,7 +159,7 @@ struct SurgeSorter
 void
 TxSetFrame::surgePricingFilter(LedgerManager const& lm)
 {
-    size_t max = lm.getMaxTxSetSize();
+    size_t max = lm.getLastMaxTxSetSize();
     if (mTransactions.size() > max)
     { // surge pricing in effect!
         CLOG(WARNING, "Herder")
@@ -165,7 +169,10 @@ TxSetFrame::surgePricingFilter(LedgerManager const& lm)
         map<AccountID, double> accountFeeMap;
         for (auto& tx : mTransactions)
         {
-            double r = tx->getFeeRatio(lm);
+            double fee = tx->getFee();
+            double minFee = lm.getLastTxFee();
+            double r = fee / minFee;
+
             double now = accountFeeMap[tx->getSourceID()];
             if (now == 0)
                 accountFeeMap[tx->getSourceID()] = r;
@@ -193,6 +200,8 @@ TxSetFrame::checkOrTrim(
     std::function<bool(std::vector<TransactionFramePtr> const&)>
         processInsufficientBalance)
 {
+    LedgerState ls(app.getLedgerStateRoot());
+
     map<AccountID, vector<TransactionFramePtr>> accountTxMap;
 
     Hash lastHash;
@@ -219,7 +228,7 @@ TxSetFrame::checkOrTrim(
         int64_t totFee = 0;
         for (auto& tx : item.second)
         {
-            if (!tx->checkValid(app, lastSeq))
+            if (!tx->checkValid(app, ls, lastSeq))
             {
                 if (processInvalidTxLambda(tx, lastSeq))
                     continue;
@@ -234,8 +243,8 @@ TxSetFrame::checkOrTrim(
         if (lastTx)
         {
             // make sure account can pay the fee for all these tx
-            auto const& source = lastTx->getSourceAccount();
-            if (source.getAvailableBalance(app.getLedgerManager()) < totFee)
+            auto const& source = stellar::loadAccount(ls, lastTx->getSourceID());
+            if (getAvailableBalance(ls.loadHeader(), source) < totFee)
             {
                 if (!processInsufficientBalance(item.second))
                     return false;
@@ -281,10 +290,6 @@ TxSetFrame::trimInvalid(Application& app,
 bool
 TxSetFrame::checkValid(Application& app)
 {
-    // Establish read-only transaction for duration of checkValid
-    soci::transaction sqltx(app.getDatabase().getSession());
-    app.getDatabase().setCurrentTransactionReadOnly();
-
     auto& lcl = app.getLedgerManager().getLastClosedLedgerHeader();
     // Start by checking previousLedgerHash
     if (lcl.hash != mPreviousLedgerHash)
@@ -292,8 +297,7 @@ TxSetFrame::checkValid(Application& app)
         CLOG(DEBUG, "Herder")
             << "Got bad txSet: " << hexAbbrev(mPreviousLedgerHash)
             << " ; expected: "
-            << hexAbbrev(
-                   app.getLedgerManager().getLastClosedLedgerHeader().hash);
+            << hexAbbrev(lcl.hash);
         return false;
     }
 
