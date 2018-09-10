@@ -26,6 +26,7 @@
 #include "invariant/LedgerEntryIsValid.h"
 #include "invariant/LiabilitiesMatchOffers.h"
 #include "ledger/LedgerManager.h"
+#include "ledger/LedgerState.h"
 #include "main/CommandHandler.h"
 #include "main/ExternalQueue.h"
 #include "main/Maintainer.h"
@@ -121,6 +122,7 @@ ApplicationImpl::initialize()
     mWorkManager = WorkManager::create(*this);
     mBanManager = BanManager::create(*this);
     mStatusManager = std::make_unique<StatusManager>();
+    mLedgerStateRoot = std::make_unique<LedgerStateRoot>(*mDatabase);
 
     BucketListIsConsistentWithDatabase::registerInvariant(*this);
     AccountSubEntriesCountIsValid::registerInvariant(*this);
@@ -761,5 +763,11 @@ std::unique_ptr<OverlayManager>
 ApplicationImpl::createOverlayManager()
 {
     return OverlayManager::create(*this);
+}
+
+LedgerStateRoot&
+ApplicationImpl::getLedgerStateRoot()
+{
+    return *mLedgerStateRoot;
 }
 }

@@ -31,6 +31,7 @@ class CommandHandler;
 class Database;
 class LoadGenerator;
 class NtpSynchronizationChecker;
+class LedgerStateRoot;
 
 class ApplicationImpl : public Application
 {
@@ -105,6 +106,8 @@ class ApplicationImpl : public Application
 
     virtual Hash const& getNetworkID() const override;
 
+    virtual LedgerStateRoot& getLedgerStateRoot() override;
+
   protected:
     std::unique_ptr<LedgerManager>
         mLedgerManager;              // allow to change that for tests
@@ -146,6 +149,7 @@ class ApplicationImpl : public Application
     std::unique_ptr<BanManager> mBanManager;
     std::shared_ptr<NtpSynchronizationChecker> mNtpSynchronizationChecker;
     std::unique_ptr<StatusManager> mStatusManager;
+    std::unique_ptr<LedgerStateRoot> mLedgerStateRoot;
 
     std::vector<std::thread> mWorkerThreads;
 
