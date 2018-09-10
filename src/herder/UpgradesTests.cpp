@@ -7,11 +7,16 @@
 #include "herder/Upgrades.h"
 #include "history/HistoryArchiveManager.h"
 #include "history/HistoryTestsUtils.h"
+#include "ledger/LedgerState.h"
+#include "ledger/LedgerStateEntry.h"
+#include "ledger/LedgerStateHeader.h"
+#include "ledger/TrustLineWrapper.h"
 #include "lib/catch.hpp"
 #include "simulation/Simulation.h"
 #include "test/TestMarket.h"
 #include "test/TestUtils.h"
 #include "test/test.h"
+#include "transactions/TransactionUtils.h"
 #include "util/StatusManager.h"
 #include "util/Timer.h"
 #include "util/optional.h"
@@ -123,17 +128,14 @@ simulateUpgrade(std::vector<LedgerUpgradeNode> const& nodes,
         for (size_t i = 0; i < nodes.size(); i++)
         {
             auto const& node = simulation->getNode(keys[i].getPublicKey());
-            REQUIRE(node->getLedgerManager()
-                        .getCurrentLedgerHeader()
-                        .ledgerVersion == state[i].ledgerVersion);
-            REQUIRE(node->getLedgerManager().getCurrentLedgerHeader().baseFee ==
+            REQUIRE(node->getLedgerManager().getLastClosedLedgerHeader()
+                        .header.ledgerVersion == state[i].ledgerVersion);
+            REQUIRE(node->getLedgerManager().getLastTxFee() ==
                     state[i].baseFee);
-            REQUIRE(node->getLedgerManager()
-                        .getCurrentLedgerHeader()
-                        .maxTxSetSize == state[i].maxTxSetSize);
-            REQUIRE(
-                node->getLedgerManager().getCurrentLedgerHeader().baseReserve ==
-                state[i].baseReserve);
+            REQUIRE(node->getLedgerManager().getLastMaxTxSetSize() ==
+                    state[i].maxTxSetSize);
+            REQUIRE(node->getLedgerManager().getLastReserve() ==
+                    state[i].baseReserve);
         }
     };
 
@@ -567,13 +569,13 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
     app->start();
 
     auto& lm = app->getLedgerManager();
-    auto txFee = lm.getTxFee();
+    auto txFee = lm.getLastTxFee();
 
     auto const& lcl = lm.getLastClosedLedgerHeader();
     auto txSet = std::make_shared<TxSetFrame>(lcl.hash);
 
     auto root = TestAccount::createRoot(*app);
-    auto issuer = root.create("issuer", lm.getMinBalance(0) + 100 * txFee);
+    auto issuer = root.create("issuer", lm.getLastMinBalance(0) + 100 * txFee);
     auto native = txtest::makeNativeAsset();
     auto cur1 = issuer.asset("CUR1");
     auto cur2 = issuer.asset("CUR2");
@@ -594,18 +596,20 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
     auto getLiabilities = [&](TestAccount& acc) {
         Liabilities res;
-        auto account = txtest::loadAccount(acc.getPublicKey(), *app);
-        res.selling = account->getSellingLiabilities(lm);
-        res.buying = account->getBuyingLiabilities(lm);
+        LedgerState ls(app->getLedgerStateRoot());
+        auto account = stellar::loadAccount(ls, acc.getPublicKey());
+        res.selling = getSellingLiabilities(ls.loadHeader(), account);
+        res.buying = getBuyingLiabilities(ls.loadHeader(), account);
         return res;
     };
     auto getAssetLiabilities = [&](TestAccount& acc, Asset const& asset) {
         Liabilities res;
         if (acc.hasTrustLine(asset))
         {
-            auto trust = acc.loadTrustLine(asset);
-            res.selling = getSellingLiabilities(trust, lm);
-            res.buying = getBuyingLiabilities(trust, lm);
+            LedgerState ls(app->getLedgerStateRoot());
+            auto trust = stellar::loadTrustLine(ls, acc.getPublicKey(), asset);
+            res.selling = trust.getSellingLiabilities(ls.loadHeader());
+            res.buying = trust.getBuyingLiabilities(ls.loadHeader());
         }
         return res;
     };
@@ -631,7 +635,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
     {
         SECTION("valid native")
         {
-            auto a1 = root.create("A", lm.getMinBalance(5) + 2000 + 5 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(5) + 2000 + 5 * txFee);
             a1.changeTrust(cur1, 6000);
             issuer.pay(a1, cur1, 2000);
 
@@ -648,7 +652,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("invalid selling native")
         {
-            auto a1 = root.create("A", lm.getMinBalance(5) + 1000 + 5 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(5) + 1000 + 5 * txFee);
             a1.changeTrust(cur1, 6000);
             issuer.pay(a1, cur1, 2000);
 
@@ -682,7 +686,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
                     }
                 };
 
-            auto a1 = root.create("A", lm.getMinBalance(5) + 2000 + 5 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(5) + 2000 + 5 * txFee);
             a1.changeTrust(cur1, INT64_MAX);
             issuer.pay(a1, cur1, INT64_MAX - 4000);
 
@@ -701,7 +705,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("valid non-native")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 6 * txFee);
             a1.changeTrust(cur1, 6000);
             a1.changeTrust(cur2, 6000);
             issuer.pay(a1, cur1, 2000);
@@ -720,7 +724,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("invalid non-native")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 6 * txFee);
             a1.changeTrust(cur1, 6000);
             a1.changeTrust(cur2, 6000);
             issuer.pay(a1, cur1, 1000);
@@ -739,7 +743,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("valid non-native issued by account")
         {
-            auto a1 = root.create("A", lm.getMinBalance(4) + 4 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(4) + 4 * txFee);
             auto issuedCur1 = a1.asset("CUR1");
             auto issuedCur2 = a1.asset("CUR2");
 
@@ -758,7 +762,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
         SECTION("all valid")
         {
             auto a1 =
-                root.create("A", lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("A", lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
@@ -787,7 +791,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
         SECTION("one invalid native")
         {
             auto a1 =
-                root.create("A", lm.getMinBalance(14) + 2000 + 14 * txFee);
+                root.create("A", lm.getLastMinBalance(14) + 2000 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
@@ -816,7 +820,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
         SECTION("one invalid non-native")
         {
             auto a1 =
-                root.create("A", lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("A", lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
@@ -848,14 +852,14 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
         SECTION("all valid")
         {
             auto a1 =
-                root.create("A", lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("A", lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
             issuer.pay(a1, cur2, 4000);
 
             auto a2 =
-                root.create("B", lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("B", lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a2.changeTrust(cur1, 12000);
             a2.changeTrust(cur2, 12000);
             issuer.pay(a2, cur1, 4000);
@@ -900,14 +904,14 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
         SECTION("one invalid per account")
         {
             auto a1 =
-                root.create("A", lm.getMinBalance(14) + 2000 + 14 * txFee);
+                root.create("A", lm.getLastMinBalance(14) + 2000 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
             issuer.pay(a1, cur2, 4000);
 
             auto a2 =
-                root.create("B", lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("B", lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a2.changeTrust(cur1, 12000);
             a2.changeTrust(cur2, 12000);
             issuer.pay(a2, cur1, 4000);
@@ -972,7 +976,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("non-native for non-native, all invalid")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 6 * txFee);
             a1.changeTrust(cur1, INT64_MAX);
             a1.changeTrust(cur2, INT64_MAX);
             issuer.pay(a1, cur1, INT64_MAX / 3);
@@ -991,7 +995,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("non-native for non-native, half invalid")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 6 * txFee);
             a1.changeTrust(cur1, INT64_MAX);
             a1.changeTrust(cur2, INT64_MAX);
             issuer.pay(a1, cur1, INT64_MAX / 3);
@@ -1011,7 +1015,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("issued asset for issued asset")
         {
-            auto a1 = root.create("A", lm.getMinBalance(4) + 4 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(4) + 4 * txFee);
             auto issuedCur1 = a1.asset("CUR1");
             auto issuedCur2 = a1.asset("CUR2");
 
@@ -1046,7 +1050,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
                     }
                 };
 
-            auto a1 = root.create("A", lm.getMinBalance(6) + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 6 * txFee);
             a1.changeTrust(cur1, 1000);
             a1.changeTrust(cur2, 1000);
             issuer.pay(a1, cur1, 500);
@@ -1085,7 +1089,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
                     }
                 };
 
-            auto a1 = root.create("A", lm.getMinBalance(4) + 4 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(4) + 4 * txFee);
             a1.changeTrust(cur1, 1000);
             a1.changeTrust(cur2, 1000);
             issuer.pay(a1, cur1, 500);
@@ -1122,7 +1126,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
                 };
 
             auto a1 =
-                root.create("A", lm.getMinBalance(10) + 2000 + 12 * txFee);
+                root.create("A", lm.getLastMinBalance(10) + 2000 + 12 * txFee);
             a1.changeTrust(cur1, 5125);
             a1.changeTrust(cur2, 5125);
             issuer.pay(a1, cur1, 2050);
@@ -1134,8 +1138,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
                 // Pay txFee to send 4*baseReserve + 3*txFee for net balance
                 // decrease of 4*baseReserve + 4*txFee. This matches the balance
                 // decrease from creating 4 offers as in the next test section.
-                a1.pay(root,
-                       4 * lm.getCurrentLedgerHeader().baseReserve + 3 * txFee);
+                a1.pay(root, 4 * lm.getLastReserve() + 3 * txFee);
 
                 std::vector<TestMarketOffer> offers;
                 createOfferQuantity(a1, cur1, native, 1000, offers);
@@ -1187,7 +1190,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("both assets require authorization and authorized")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 6 * txFee);
             a1.changeTrust(cur1, 6000);
             a1.changeTrust(cur2, 6000);
             issuer.allowTrust(cur1, a1);
@@ -1208,7 +1211,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("selling asset not authorized")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 4000 + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 4000 + 6 * txFee);
             a1.changeTrust(cur1, 6000);
             a1.changeTrust(cur2, 6000);
             issuer.allowTrust(cur1, a1);
@@ -1232,7 +1235,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
         SECTION("buying asset not authorized")
         {
-            auto a1 = root.create("A", lm.getMinBalance(6) + 4000 + 6 * txFee);
+            auto a1 = root.create("A", lm.getLastMinBalance(6) + 4000 + 6 * txFee);
             a1.changeTrust(cur1, 6000);
             a1.changeTrust(cur2, 6000);
             issuer.allowTrust(cur1, a1);
@@ -1257,7 +1260,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
         SECTION("unauthorized offers still contribute liabilities")
         {
             auto a1 =
-                root.create("A", lm.getMinBalance(10) + 2000 + 10 * txFee);
+                root.create("A", lm.getLastMinBalance(10) + 2000 + 10 * txFee);
             a1.changeTrust(cur1, 6000);
             a1.changeTrust(cur2, 6000);
             issuer.allowTrust(cur1, a1);
@@ -1271,8 +1274,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
                 // Pay txFee to send 4*baseReserve + 3*txFee for net balance
                 // decrease of 4*baseReserve + 4*txFee. This matches the balance
                 // decrease from creating 4 offers as in the next test section.
-                a1.pay(root,
-                       4 * lm.getCurrentLedgerHeader().baseReserve + 3 * txFee);
+                a1.pay(root, 4 * lm.getLastReserve() + 3 * txFee);
 
                 std::vector<TestMarketOffer> offers;
                 createOffer(a1, cur1, native, offers);
@@ -1314,7 +1316,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
     SECTION("deleted trust lines")
     {
-        auto a1 = root.create("A", lm.getMinBalance(4) + 6 * txFee);
+        auto a1 = root.create("A", lm.getLastMinBalance(4) + 6 * txFee);
         a1.changeTrust(cur1, 6000);
         a1.changeTrust(cur2, 6000);
         issuer.pay(a1, cur1, 2000);
@@ -1344,7 +1346,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
 
     SECTION("offers with deleted trust lines still contribute liabilities")
     {
-        auto a1 = root.create("A", lm.getMinBalance(10) + 2000 + 12 * txFee);
+        auto a1 = root.create("A", lm.getLastMinBalance(10) + 2000 + 12 * txFee);
         a1.changeTrust(cur1, 6000);
         a1.changeTrust(cur2, 6000);
         issuer.pay(a1, cur1, 2000);
@@ -1356,8 +1358,7 @@ TEST_CASE("upgrade to version 10", "[upgrades]")
             // Pay txFee to send 4*baseReserve + 3*txFee for net balance
             // decrease of 4*baseReserve + 4*txFee. This matches the balance
             // decrease from creating 4 offers as in the next test section.
-            a1.pay(root,
-                   4 * lm.getCurrentLedgerHeader().baseReserve + 3 * txFee);
+            a1.pay(root, 4 * lm.getLastReserve() + 3 * txFee);
 
             std::vector<TestMarketOffer> offers;
             createOffer(a1, cur1, native, offers);
@@ -1406,13 +1407,13 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
     app->start();
 
     auto& lm = app->getLedgerManager();
-    auto txFee = lm.getTxFee();
+    auto txFee = lm.getLastTxFee();
 
     auto const& lcl = lm.getLastClosedLedgerHeader();
     auto txSet = std::make_shared<TxSetFrame>(lcl.hash);
 
     auto root = TestAccount::createRoot(*app);
-    auto issuer = root.create("issuer", lm.getMinBalance(0) + 100 * txFee);
+    auto issuer = root.create("issuer", lm.getLastMinBalance(0) + 100 * txFee);
     auto native = txtest::makeNativeAsset();
     auto cur1 = issuer.asset("CUR1");
     auto cur2 = issuer.asset("CUR2");
@@ -1433,16 +1434,21 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
 
     auto getLiabilities = [&](TestAccount& acc) {
         Liabilities res;
-        auto account = txtest::loadAccount(acc.getPublicKey(), *app);
-        res.selling = account->getSellingLiabilities(lm);
-        res.buying = account->getBuyingLiabilities(lm);
+        LedgerState ls(app->getLedgerStateRoot());
+        auto account = stellar::loadAccount(ls, acc.getPublicKey());
+        res.selling = getSellingLiabilities(ls.loadHeader(), account);
+        res.buying = getBuyingLiabilities(ls.loadHeader(), account);
         return res;
     };
     auto getAssetLiabilities = [&](TestAccount& acc, Asset const& asset) {
         Liabilities res;
-        auto trust = acc.loadTrustLine(asset);
-        res.selling = getSellingLiabilities(trust, lm);
-        res.buying = getBuyingLiabilities(trust, lm);
+        if (acc.hasTrustLine(asset))
+        {
+            LedgerState ls(app->getLedgerStateRoot());
+            auto trust = stellar::loadTrustLine(ls, acc.getPublicKey(), asset);
+            res.selling = trust.getSellingLiabilities(ls.loadHeader());
+            res.buying = trust.getBuyingLiabilities(ls.loadHeader());
+        }
         return res;
     };
 
@@ -1465,7 +1471,7 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
 
     SECTION("decrease reserve")
     {
-        auto a1 = root.create("A", lm.getMinBalance(14) + 4000 + 14 * txFee);
+        auto a1 = root.create("A", lm.getLastMinBalance(14) + 4000 + 14 * txFee);
         a1.changeTrust(cur1, 12000);
         a1.changeTrust(cur2, 12000);
         issuer.pay(a1, cur1, 4000);
@@ -1486,12 +1492,12 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
         createOffer(a1, cur2, cur1, offers);
 
         for_versions_to(9, *app, [&] {
-            uint32_t baseReserve = lm.getCurrentLedgerHeader().baseReserve;
+            uint32_t baseReserve = lm.getLastReserve();
             market.requireChanges(offers,
                                   std::bind(executeUpgrade, baseReserve / 2));
         });
         for_versions_from(10, *app, [&] {
-            uint32_t baseReserve = lm.getCurrentLedgerHeader().baseReserve;
+            uint32_t baseReserve = lm.getLastReserve();
             market.requireChanges(offers,
                                   std::bind(executeUpgrade, baseReserve / 2));
             REQUIRE(getLiabilities(a1) == Liabilities{8000, 4000});
@@ -1504,14 +1510,14 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
     {
         for_versions_to(9, *app, [&] {
             auto a1 =
-                root.create("A", 2 * lm.getMinBalance(14) + 3999 + 14 * txFee);
+                root.create("A", 2 * lm.getLastMinBalance(14) + 3999 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
             issuer.pay(a1, cur2, 4000);
 
             auto a2 =
-                root.create("B", 2 * lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("B", 2 * lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a2.changeTrust(cur1, 12000);
             a2.changeTrust(cur2, 12000);
             issuer.pay(a2, cur1, 4000);
@@ -1544,20 +1550,20 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
             createOffer(a2, cur2, cur1, offers);
             createOffer(a2, cur2, cur1, offers);
 
-            uint32_t baseReserve = lm.getCurrentLedgerHeader().baseReserve;
+            uint32_t baseReserve = lm.getLastReserve();
             market.requireChanges(offers,
                                   std::bind(executeUpgrade, 2 * baseReserve));
         });
         for_versions_from(10, *app, [&] {
             auto a1 =
-                root.create("A", 2 * lm.getMinBalance(14) + 3999 + 14 * txFee);
+                root.create("A", 2 * lm.getLastMinBalance(14) + 3999 + 14 * txFee);
             a1.changeTrust(cur1, 12000);
             a1.changeTrust(cur2, 12000);
             issuer.pay(a1, cur1, 4000);
             issuer.pay(a1, cur2, 4000);
 
             auto a2 =
-                root.create("B", 2 * lm.getMinBalance(14) + 4000 + 14 * txFee);
+                root.create("B", 2 * lm.getLastMinBalance(14) + 4000 + 14 * txFee);
             a2.changeTrust(cur1, 12000);
             a2.changeTrust(cur2, 12000);
             issuer.pay(a2, cur1, 4000);
@@ -1590,7 +1596,7 @@ TEST_CASE("upgrade base reserve", "[upgrades]")
             createOffer(a2, cur2, cur1, offers);
             createOffer(a2, cur2, cur1, offers);
 
-            uint32_t baseReserve = lm.getCurrentLedgerHeader().baseReserve;
+            uint32_t baseReserve = lm.getLastReserve();
             market.requireChanges(offers,
                                   std::bind(executeUpgrade, 2 * baseReserve));
             REQUIRE(getLiabilities(a1) == Liabilities{8000, 0});
