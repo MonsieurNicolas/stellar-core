@@ -285,7 +285,6 @@ TEST_CASE("Invariant for liabilities", "[invariant][liabilitiesmatchoffers]")
 
     VirtualClock clock;
     Application::pointer app = createTestApplication(clock, cfg);
-    LedgerManager& lm = app->getLedgerManager();
 
     Asset native;
 

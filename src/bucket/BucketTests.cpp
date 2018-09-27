@@ -1054,9 +1054,6 @@ TEST_CASE("bucket apply", "[bucket]")
     std::shared_ptr<Bucket> death =
         Bucket::fresh(app->getBucketManager(), noLive, dead);
 
-    auto& db = app->getDatabase();
-    auto& sess = db.getSession();
-
     CLOG(INFO, "Bucket") << "Applying bucket with " << live.size()
                          << " live entries";
     birth->apply(*app);

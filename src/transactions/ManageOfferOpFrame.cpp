@@ -430,10 +430,10 @@ ManageOfferOpFrame::doApply(Application& app, AbstractLedgerState& lsOuter)
                 }
 
                 OfferEntry& oe = newOffer.data.offer();
-                int64_t maxSheepSend =
+                int64_t sheepSendLimit =
                     std::min({oe.amount, canSellAtMost(header, sourceAccount, sheep, sheepLineA)});
-                int64_t maxWheatReceive = canBuyAtMost(header, sourceAccount, wheat, wheatLineA);
-                oe.amount = adjustOffer(oe.price, maxSheepSend, maxWheatReceive);
+                int64_t wheatReceiveLimit = canBuyAtMost(header, sourceAccount, wheat, wheatLineA);
+                oe.amount = adjustOffer(oe.price, sheepSendLimit, wheatReceiveLimit);
             }
             else
             {

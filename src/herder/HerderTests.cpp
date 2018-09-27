@@ -384,8 +384,6 @@ TEST_CASE("surge", "[herder]")
 
     app->start();
 
-    auto& lm = app->getLedgerManager();
-
     {
         LedgerState ls(app->getLedgerStateRoot());
         ls.loadHeader().current().maxTxSetSize = 

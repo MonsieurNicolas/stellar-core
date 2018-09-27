@@ -59,7 +59,6 @@ BucketApplicator::advance()
         }
     }
     ls.commit();
-    mApp.getDatabase().clearPreparedStatementCache();
 
     if (!mBucketIter || (mSize & 0xfff) == 0xfff)
     {

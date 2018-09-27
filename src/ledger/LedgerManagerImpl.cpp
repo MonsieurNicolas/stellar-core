@@ -261,9 +261,12 @@ LedgerManagerImpl::loadLastKnownLedger(
         {
             throw std::runtime_error("Could not load ledger from database");
         }
-        LedgerState ls(mApp.getLedgerStateRoot());
-        ls.loadHeader().current() = *currentLedger;
-        ls.commit();
+
+        {
+            LedgerState ls(mApp.getLedgerStateRoot());
+            ls.loadHeader().current() = *currentLedger;
+            ls.commit();
+        }
 
         if (handler)
         {
@@ -892,7 +895,6 @@ LedgerManagerImpl::closeLedger(LedgerCloseData const& ledgerData)
     hm.maybeQueueHistoryCheckpoint();
 
     // step 2
-    mApp.getDatabase().clearPreparedStatementCache();
     ls.commit();
 
     // step 3
@@ -938,11 +940,11 @@ LedgerManagerImpl::processFeesSeqNums(std::vector<TransactionFramePtr>& txs,
     try
     {
         LedgerState ls(lsOuter);
+        auto ledgerSeq = ls.loadHeader().current().ledgerSeq;
         for (auto tx : txs)
         {
             LedgerState lsTx(ls);
             tx->processFeeSeqNum(lsTx);
-            auto ledgerSeq = lsTx.loadHeader().current().ledgerSeq;
             tx->storeTransactionFee(mApp.getDatabase(), ledgerSeq,
                                     lsTx.getChanges(), ++index);
             lsTx.commit();

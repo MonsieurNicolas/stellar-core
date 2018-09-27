@@ -22,6 +22,9 @@
 
 using namespace stellar;
 
+namespace BucketListIsConsistentWithDatabaseTests
+{
+
 struct BucketListGenerator
 {
     VirtualClock mClock;
@@ -222,7 +225,7 @@ struct SelectBucketListGenerator : public BucketListGenerator
 
             if (!filteredKeys.empty())
             {
-                std::uniform_int_distribution<uint32_t> dist(
+                std::uniform_int_distribution<size_t> dist(
                     0, filteredKeys.size() - 1);
                 auto iter = filteredKeys.begin();
                 std::advance(iter, dist(*mGen));
@@ -441,6 +444,9 @@ class ApplyBucketsWorkModifyEntry : public ApplyBucketsWork
         return r;
     }
 };
+}
+
+using namespace BucketListIsConsistentWithDatabaseTests;
 
 TEST_CASE("BucketListIsConsistentWithDatabase succeed",
           "[invariant][bucketlistconsistent]")
@@ -496,7 +502,7 @@ TEST_CASE("BucketListIsConsistentWithDatabase test root account",
         TestRootBucketListGenerator()
             : BucketListGenerator()
             , mTargetLedger(
-                  std::uniform_int_distribution<size_t>(2, 100)(*mGen))
+                  std::uniform_int_distribution<uint32_t>(2, 100)(*mGen))
             , mModifiedRoot(false)
         {
         }

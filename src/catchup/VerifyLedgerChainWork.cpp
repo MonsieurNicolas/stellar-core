@@ -19,7 +19,6 @@ static HistoryManager::LedgerVerificationStatus
 verifyLedgerHistoryEntry(LedgerHeaderHistoryEntry const& hhe)
 {
     Hash calculated = sha256(xdr::xdr_to_opaque(hhe.header));
-    assert(!isZero(calculated));
     if (calculated != hhe.hash)
     {
         CLOG(ERROR, "History")

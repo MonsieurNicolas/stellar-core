@@ -27,7 +27,6 @@ TEST_CASE("change trust", "[tx][changetrust]")
 
     VirtualClock clock;
     auto app = createTestApplication(clock, cfg);
-    Database& db = app->getDatabase();
 
     app->start();
 

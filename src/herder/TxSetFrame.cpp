@@ -172,7 +172,7 @@ TxSetFrame::surgePricingFilter(Application& app)
         for (auto& tx : mTransactions)
         {
             double fee = tx->getFee();
-            double minFee = tx->getMinFee(header);
+            double minFee = (double)tx->getMinFee(header);
             double r = fee / minFee;
 
             double now = accountFeeMap[tx->getSourceID()];

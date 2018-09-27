@@ -115,8 +115,9 @@ expectedResult(int64_t fee, size_t opsCount, TransactionResultCode code,
 bool
 applyCheck(TransactionFramePtr tx, Application& app, bool checkSeqNum)
 {
-    app.getDatabase().clearPreparedStatementCache();
     LedgerState ls(app.getLedgerStateRoot());
+    // Increment ledgerSeq to simulate the behavior of closeLedger, which begins
+    // by advancing the ledgerSeq.
     ++ls.loadHeader().current().ledgerSeq;
 
     bool check = false;
@@ -124,8 +125,8 @@ applyCheck(TransactionFramePtr tx, Application& app, bool checkSeqNum)
     TransactionResultCode code;
     AccountEntry srcAccountBefore;
     {
-        LedgerState lsCheck(ls);
-        check = tx->checkValid(app, lsCheck, 0);
+        LedgerState lsFeeProc(ls);
+        check = tx->checkValid(app, lsFeeProc, 0);
         checkResult = tx->getResult();
         REQUIRE((!check || checkResult.result.code() == txSUCCESS));
 
@@ -139,14 +140,14 @@ applyCheck(TransactionFramePtr tx, Application& app, bool checkSeqNum)
         if (code != txNO_ACCOUNT)
         {
             srcAccountBefore =
-                loadAccount(lsCheck, tx->getSourceID(), true).current().data.account();
+                loadAccount(lsFeeProc, tx->getSourceID(), true).current().data.account();
 
             // no account -> can't process the fee
-            tx->processFeeSeqNum(lsCheck);
-            uint32_t ledgerVersion = lsCheck.loadHeader().current().ledgerVersion;
+            tx->processFeeSeqNum(lsFeeProc);
+            uint32_t ledgerVersion = lsFeeProc.loadHeader().current().ledgerVersion;
 
             // verify that the fee got processed
-            auto lsDelta = lsCheck.getDelta();
+            auto lsDelta = lsFeeProc.getDelta();
             REQUIRE(lsDelta.entry.size() == 1);
             auto current = lsDelta.entry.begin()->second.current;
             REQUIRE(current);
@@ -167,7 +168,7 @@ applyCheck(TransactionFramePtr tx, Application& app, bool checkSeqNum)
             }
             REQUIRE(currAcc == prevAcc);
         }
-        lsCheck.commit();
+        lsFeeProc.commit();
     }
 
     bool res = false;
@@ -253,6 +254,9 @@ applyCheck(TransactionFramePtr tx, Application& app, bool checkSeqNum)
         lsTx.commit();
     }
 
+    // Undo the increment from the beginning of this function. Note that if this
+    // function exits without reaching this point, then ls will not be committed
+    // and the increment will be rolled back anyway.
     --ls.loadHeader().current().ledgerSeq;
     ls.commit();
     return res;

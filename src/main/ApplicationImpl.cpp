@@ -42,6 +42,7 @@
 #include "scp/LocalNode.h"
 #include "scp/QuorumSetUtils.h"
 #include "simulation/LoadGenerator.h"
+#include "util/GlobalChecks.h"
 #include "util/StatusManager.h"
 #include "work/WorkManager.h"
 
@@ -229,8 +230,8 @@ ApplicationImpl::getJsonInfo()
     info["protocol_version"] = getConfig().LEDGER_PROTOCOL_VERSION;
     info["state"] = getStateHuman();
     info["startedOn"] = VirtualClock::pointToISOString(mStartedOn);
-    info["ledger"]["num"] = (int)(lm.getLastClosedLedgerNum() + 1);
     auto const& lcl = lm.getLastClosedLedgerHeader();
+    info["ledger"]["num"] = (int)lcl.header.ledgerSeq;
     info["ledger"]["hash"] = binToHex(lcl.hash);
     info["ledger"]["closeTime"] = (Json::UInt64)lcl.header.scpValue.closeTime;
     info["ledger"]["version"] = lcl.header.ledgerVersion;
@@ -766,6 +767,7 @@ ApplicationImpl::createOverlayManager()
 LedgerStateRoot&
 ApplicationImpl::getLedgerStateRoot()
 {
+    assertThreadIsMain();
     return *mLedgerStateRoot;
 }
 }

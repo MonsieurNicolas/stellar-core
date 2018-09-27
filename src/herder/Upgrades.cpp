@@ -405,8 +405,9 @@ addLiabilities(std::map<Asset, std::unique_ptr<int64_t>>& liabilities,
 }
 
 static int64_t
-getAvailableBalance(AccountID const& accountID, Asset const& asset,
-                    int64_t balanceAboveReserve, AbstractLedgerState& ls)
+getAvailableBalanceExcludingLiabilities(
+    AccountID const& accountID, Asset const& asset, int64_t balanceAboveReserve,
+    AbstractLedgerState& ls)
 {
     if (asset.type() == ASSET_TYPE_NATIVE)
     {
@@ -432,8 +433,9 @@ getAvailableBalance(AccountID const& accountID, Asset const& asset,
 }
 
 static int64_t
-getAvailableLimit(AccountID const& accountID, Asset const& asset,
-                  int64_t balance, AbstractLedgerState& ls)
+getAvailableLimitExcludingLiabilities(
+    AccountID const& accountID, Asset const& asset, int64_t balance,
+    AbstractLedgerState& ls)
 {
     if (asset.type() == ASSET_TYPE_NATIVE)
     {
@@ -497,12 +499,11 @@ updateOffer(
     using namespace std::placeholders;
     auto& offer = offerEntry.current().data.offer();
 
-    auto availableBalanceBind = std::bind(
-        (int64_t(*)(AccountID const&, Asset const&, int64_t,
-                    AbstractLedgerState&))getAvailableBalance,
-        offer.sellerID, _1, _2, std::ref(ls));
-    auto availableLimitBind = std::bind(getAvailableLimit, offer.sellerID, _1,
-                                        _2, std::ref(ls));
+    auto availableBalanceBind =
+        std::bind(getAvailableBalanceExcludingLiabilities, offer.sellerID, _1,
+                  _2, std::ref(ls));
+    auto availableLimitBind = std::bind(getAvailableLimitExcludingLiabilities,
+                                        offer.sellerID, _1, _2, std::ref(ls));
 
     bool erase =
         shouldDeleteOffer(offer.selling, balanceAboveReserve,
@@ -605,11 +606,11 @@ prepareLiabilities(AbstractLedgerState& ls)
         }
 
         auto accountEntry = stellar::loadAccount(ls, accountOffers.first);
-        auto const& acc = accountEntry.current().data.account();
         if (!accountEntry)
         {
             throw std::runtime_error("account does not exist");
         }
+        auto const& acc = accountEntry.current().data.account();
         AccountEntry const accountBefore = acc;
 
         // balanceAboveReserve must exclude native selling liabilities, since
