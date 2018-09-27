@@ -53,7 +53,7 @@ CreateAccountOpFrame::doApply(Application& app, AbstractLedgerState& ls)
             {
                 LedgerKey key(ACCOUNT);
                 key.account().accountID = getSourceID();
-                doesAccountExist = ls.loadWithoutRecord(key);
+                doesAccountExist = (bool)ls.loadWithoutRecord(key);
             }
 
             auto sourceAccount = loadSourceAccount(ls, header);

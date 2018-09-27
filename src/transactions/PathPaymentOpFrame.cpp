@@ -63,7 +63,7 @@ PathPaymentOpFrame::doApply(Application& app, AbstractLedgerState& ls)
     bool doesSourceAccountExist = true;
     if (ls.loadHeader().current().ledgerVersion < 8)
     {
-        doesSourceAccountExist = stellar::loadAccountWithoutRecord(ls, getSourceID());
+        doesSourceAccountExist = (bool)stellar::loadAccountWithoutRecord(ls, getSourceID());
     }
 
     if (!bypassIssuerCheck)

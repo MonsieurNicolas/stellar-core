@@ -168,8 +168,7 @@ TransactionFrame::loadSourceAccount(AbstractLedgerState& ls,
         if (res)
         {
             auto newest = ls.getNewestVersion(LedgerEntryKey(res.current()));
-            assert(newest.ledgerState == &ls);
-            mCachedAccount = newest.entry;
+            mCachedAccount = newest;
         }
         else
         {
@@ -199,8 +198,7 @@ TransactionFrame::loadAccount(AbstractLedgerState& ls,
         }
 
         auto newest = ls.getNewestVersion(LedgerEntryKey(res.current()));
-        assert(newest.ledgerState == &ls);
-        mCachedAccount = newest.entry;
+        mCachedAccount = newest;
         return res;
     }
     else
@@ -302,7 +300,7 @@ TransactionFrame::processSeqNum(AbstractLedgerState& ls)
     if (header.current().ledgerVersion >= 10)
     {
         auto sourceAccount = loadSourceAccount(ls, header);
-        if (sourceAccount > mEnvelope.tx.seqNum)
+        if (sourceAccount.current().data.account().seqNum > mEnvelope.tx.seqNum)
         {
             throw std::runtime_error("unexpected sequence number");
         }

@@ -12,33 +12,19 @@ namespace stellar
 class AbstractLedgerState;
 struct LedgerHeader;
 
-class HeaderImpl
-{
-    AbstractLedgerState& mLedgerState;
-    LedgerHeader& mCurrent;
-
-  public:
-    explicit HeaderImpl(AbstractLedgerState& ls, LedgerHeader& current);
-
-    // Copy construction and copy assignment are forbidden.
-    HeaderImpl(HeaderImpl const&) = delete;
-    HeaderImpl& operator=(HeaderImpl const&) = delete;
-
-    // Move construction and move assignment are forbidden.
-    HeaderImpl(HeaderImpl&& other) = delete;
-    HeaderImpl& operator=(HeaderImpl&& other) = delete;
-
-    LedgerHeader& current();
-
-    void deactivate();
-};
-
 class LedgerStateHeader
 {
-    std::weak_ptr<HeaderImpl> mImpl;
+  public:
+    class Impl;
+
+  private:
+    std::weak_ptr<Impl> mImpl;
+
+    std::shared_ptr<Impl> getImpl();
+    std::shared_ptr<Impl const> getImpl() const;
 
   public:
-    explicit LedgerStateHeader(std::shared_ptr<HeaderImpl> const& impl);
+    explicit LedgerStateHeader(std::shared_ptr<Impl> const& impl);
 
     ~LedgerStateHeader();
 
@@ -50,11 +36,16 @@ class LedgerStateHeader
     LedgerStateHeader(LedgerStateHeader&& other);
     LedgerStateHeader& operator=(LedgerStateHeader&& other);
 
-    operator bool() const;
+    explicit operator bool() const;
 
     LedgerHeader& current();
     LedgerHeader const& current() const;
 
     void deactivate();
+
+    void swap(LedgerStateHeader& other);
+
+    static std::shared_ptr<Impl>
+    makeSharedImpl(AbstractLedgerState& ls, LedgerHeader& current);
 };
 }

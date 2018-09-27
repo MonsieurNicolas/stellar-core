@@ -4,7 +4,8 @@
 
 #include "crypto/KeyUtils.h"
 #include "crypto/SecretKey.h"
-#include "ledger/LedgerState.h"
+#include "database/Database.h"
+#include "ledger/LedgerStateImpl.h"
 #include "util/Decoder.h"
 
 namespace stellar
@@ -113,7 +114,9 @@ LedgerStateRoot::Impl::deleteData(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropData()
 {
-    mCache->clear();
+    checkNoChild();
+    mEntryCache->clear();
+    mBestOffersCache->clear();
 
     mDatabase.getSession() << "DROP TABLE IF EXISTS accountdata;";
     mDatabase.getSession() <<

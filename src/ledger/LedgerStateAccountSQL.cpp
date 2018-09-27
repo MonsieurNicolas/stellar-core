@@ -6,7 +6,7 @@
 #include "crypto/SecretKey.h"
 #include "crypto/SignerKey.h"
 #include "database/Database.h"
-#include "ledger/LedgerState.h"
+#include "ledger/LedgerStateImpl.h"
 #include "util/Decoder.h"
 #include "util/types.h"
 #include "util/XDROperators.h"
@@ -370,7 +370,9 @@ LedgerStateRoot::Impl::deleteAccount(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropAccounts()
 {
-    mCache->clear();
+    checkNoChild();
+    mEntryCache->clear();
+    mBestOffersCache->clear();
 
     mDatabase.getSession() << "DROP TABLE IF EXISTS accounts;";
     mDatabase.getSession() << "DROP TABLE IF EXISTS signers;";

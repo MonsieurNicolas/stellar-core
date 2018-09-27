@@ -20,40 +20,20 @@ class EntryImplBase
     }
 };
 
-class LedgerStateEntryImpl : public EntryImplBase
-{
-    AbstractLedgerState& mLedgerState;
-    LedgerEntry& mCurrent;
-
-  public:
-    explicit LedgerStateEntryImpl(AbstractLedgerState& ls,
-                                  LedgerEntry& current);
-
-    ~LedgerStateEntryImpl() override;
-
-    // Copy construction and copy assignment are forbidden.
-    LedgerStateEntryImpl(LedgerStateEntryImpl const&) = delete;
-    LedgerStateEntryImpl& operator=(LedgerStateEntryImpl const&) = delete;
-
-    // Move construction and move assignment are forbidden.
-    LedgerStateEntryImpl(LedgerStateEntryImpl&& other) = delete;
-    LedgerStateEntryImpl& operator=(LedgerStateEntryImpl&& other) = delete;
-
-    LedgerEntry& current();
-
-    void deactivate();
-
-    void erase();
-};
-
 class LedgerStateEntry
 {
-    std::weak_ptr<LedgerStateEntryImpl> mImpl;
+  public:
+    class Impl;
+
+  private:
+    std::weak_ptr<Impl> mImpl;
+
+    std::shared_ptr<Impl> getImpl();
+    std::shared_ptr<Impl const> getImpl() const;
 
   public:
     LedgerStateEntry();
-    explicit LedgerStateEntry(
-        std::shared_ptr<LedgerStateEntryImpl> const& impl);
+    explicit LedgerStateEntry(std::shared_ptr<Impl> const& impl);
 
     ~LedgerStateEntry();
 
@@ -65,7 +45,7 @@ class LedgerStateEntry
     LedgerStateEntry(LedgerStateEntry&& other);
     LedgerStateEntry& operator=(LedgerStateEntry&& other);
 
-    operator bool() const;
+    explicit operator bool() const;
 
     LedgerEntry& current();
     LedgerEntry const& current() const;
@@ -75,42 +55,25 @@ class LedgerStateEntry
     void erase();
 
     void swap(LedgerStateEntry& other);
-};
 
-class ConstLedgerStateEntryImpl : public EntryImplBase
-{
-    AbstractLedgerState& mLedgerState;
-    LedgerEntry const mCurrent;
-
-  public:
-    explicit ConstLedgerStateEntryImpl(AbstractLedgerState& ls,
-                                       LedgerEntry const& current);
-
-    ~ConstLedgerStateEntryImpl() override;
-
-    // Copy construction and copy assignment are forbidden.
-    ConstLedgerStateEntryImpl(ConstLedgerStateEntryImpl const&) = delete;
-    ConstLedgerStateEntryImpl&
-    operator=(ConstLedgerStateEntryImpl const&) = delete;
-
-    // Move construction and move assignment are forbidden.
-    ConstLedgerStateEntryImpl(ConstLedgerStateEntryImpl&& other) = delete;
-    ConstLedgerStateEntryImpl&
-    operator=(ConstLedgerStateEntryImpl&& other) = delete;
-
-    LedgerEntry const& current() const;
-
-    void deactivate();
+    static std::shared_ptr<Impl>
+    makeSharedImpl(AbstractLedgerState& ls, LedgerEntry& current);
 };
 
 class ConstLedgerStateEntry
 {
-    std::weak_ptr<ConstLedgerStateEntryImpl> mImpl;
+  public:
+    class Impl;
+
+  private:
+    std::weak_ptr<Impl> mImpl;
+
+    std::shared_ptr<Impl> getImpl();
+    std::shared_ptr<Impl const> getImpl() const;
 
   public:
     ConstLedgerStateEntry();
-    explicit ConstLedgerStateEntry(
-        std::shared_ptr<ConstLedgerStateEntryImpl> const& impl);
+    explicit ConstLedgerStateEntry(std::shared_ptr<Impl> const& impl);
 
     ~ConstLedgerStateEntry();
 
@@ -122,12 +85,21 @@ class ConstLedgerStateEntry
     ConstLedgerStateEntry(ConstLedgerStateEntry&& other);
     ConstLedgerStateEntry& operator=(ConstLedgerStateEntry&& other);
 
-    operator bool() const;
+    explicit operator bool() const;
 
     LedgerEntry const& current() const;
 
     void deactivate();
 
     void swap(ConstLedgerStateEntry& other);
+
+    static std::shared_ptr<Impl>
+    makeSharedImpl(AbstractLedgerState& ls, LedgerEntry const& current);
 };
+
+std::shared_ptr<EntryImplBase>
+toEntryImplBase(std::shared_ptr<LedgerStateEntry::Impl> const& impl);
+
+std::shared_ptr<EntryImplBase>
+toEntryImplBase(std::shared_ptr<ConstLedgerStateEntry::Impl> const& impl);
 }

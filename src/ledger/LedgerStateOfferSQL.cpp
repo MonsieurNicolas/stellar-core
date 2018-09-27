@@ -5,7 +5,7 @@
 #include "crypto/KeyUtils.h"
 #include "crypto/SecretKey.h"
 #include "database/Database.h"
-#include "ledger/LedgerState.h"
+#include "ledger/LedgerStateImpl.h"
 #include "util/types.h"
 #include "util/XDROperators.h"
 
@@ -394,7 +394,9 @@ LedgerStateRoot::Impl::deleteOffer(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropOffers()
 {
-    mCache->clear();
+    checkNoChild();
+    mEntryCache->clear();
+    mBestOffersCache->clear();
 
     mDatabase.getSession() << "DROP TABLE IF EXISTS offers;";
     mDatabase.getSession() <<
