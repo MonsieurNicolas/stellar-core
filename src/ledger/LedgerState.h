@@ -51,6 +51,42 @@ struct LedgerStateDelta
     HeaderDelta header;
 };
 
+class LedgerStateRootFatalError : public std::runtime_error
+{
+  public:
+    explicit LedgerStateRootFatalError(std::string const& msg);
+};
+
+// An abstraction for an object that is iterator-like and permits enumerating
+// the LedgerStateEntry objects managed by an AbstractLedgerState. This enables
+// an AbstractLedgerStateParent to iterate over the entries managed by its child
+// without any knowledge of the implementation of the child.
+class EntryIterator
+{
+  public:
+    class AbstractImpl;
+
+  private:
+    std::unique_ptr<AbstractImpl> mImpl;
+
+    std::unique_ptr<AbstractImpl> const& getImpl() const;
+
+  public:
+    EntryIterator(std::unique_ptr<AbstractImpl>&& impl);
+
+    EntryIterator(EntryIterator&& other);
+
+    EntryIterator& operator++();
+
+    explicit operator bool() const;
+
+    LedgerEntry const& entry() const;
+
+    bool entryExists() const;
+
+    LedgerKey const& key() const;
+};
+
 // An abstraction for an object that can be the parent of an AbstractLedgerState
 // (discussed below). Allows children to commit atomically to the parent. Has no
 // notion of a LedgerStateEntry or LedgerStateHeader (discussed respectively in
@@ -79,7 +115,7 @@ class AbstractLedgerStateParent
     // commitChild and rollbackChild are called by a child AbstractLedgerState
     // to trigger an atomic commit or an atomic rollback of the data stored in
     // the child.
-    virtual void commitChild(Identifier id) = 0;
+    virtual void commitChild(Identifier id, EntryIterator iter) = 0;
     virtual void rollbackChild(Identifier id) = 0;
 
     // getAllOffers, getBestOffer, and getOffersByAccountAndAsset are used to
@@ -92,7 +128,7 @@ class AbstractLedgerStateParent
     //     Get XDR for every offer owned by the specified account that is either
     //     buying or selling the specified asset.
     virtual std::map<LedgerKey, LedgerEntry> getAllOffers() = 0;
-    virtual std::shared_ptr<LedgerEntry>
+    virtual std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  std::set<LedgerKey>&& exclude) = 0;
     virtual std::map<LedgerKey, LedgerEntry>
@@ -136,8 +172,6 @@ class AbstractLedgerState : public AbstractLedgerStateParent
     virtual void deactivateHeader() = 0;
 
   public:
-    class EntryIterator;
-
     // Automatically rollback the data stored in the AbstractLedgerState if it
     // has not already been committed or rolled back.
     virtual ~AbstractLedgerState();
@@ -206,10 +240,6 @@ class AbstractLedgerState : public AbstractLedgerStateParent
     virtual std::vector<LedgerKey> getDeadEntries() = 0;
     virtual std::vector<LedgerEntry> getLiveEntries() = 0;
 
-    // getEntryIterator returns an iterator-like object which can be used to
-    // enumerate the data stored in AbstractLedgerState.
-    virtual EntryIterator getEntryIterator() const = 0;
-
     // loadAllOffers, loadBestOffer, and loadOffersByAccountAndAsset are used to
     // handle some specific queries related to Offers. These functions are built
     // on top of load, and so share many properties with that function.
@@ -238,34 +268,6 @@ class AbstractLedgerState : public AbstractLedgerStateParent
     virtual void unsealHeader(std::function<void(LedgerHeader&)> f) = 0;
 };
 
-// An abstraction for an object that is iterator-like and permits enumerating
-// the LedgerStateEntry objects managed by an AbstractLedgerState. This enables
-// an AbstractLedgerStateParent to iterate over the entries managed by its child
-// without any knowledge of the implementation of the child.
-class AbstractLedgerState::EntryIterator
-{
-  public:
-    class AbstractImpl;
-
-  private:
-    std::unique_ptr<AbstractImpl> mImpl;
-
-  public:
-    EntryIterator(std::unique_ptr<AbstractImpl>&& impl);
-
-    EntryIterator(EntryIterator&& other);
-
-    EntryIterator& operator++();
-
-    explicit operator bool() const;
-
-    LedgerEntry const& entry() const;
-
-    bool entryExists() const;
-
-    LedgerKey const& key() const;
-};
-
 class LedgerState : public AbstractLedgerState
 {
     class Impl;
@@ -274,6 +276,8 @@ class LedgerState : public AbstractLedgerState
     void deactivate(LedgerKey const& key) override;
 
     void deactivateHeader() override;
+
+    std::unique_ptr<Impl> const& getImpl() const;
 
   public:
     explicit LedgerState(AbstractLedgerStateParent& parent,
@@ -286,7 +290,7 @@ class LedgerState : public AbstractLedgerState
 
     void commit() override;
 
-    void commitChild(Identifier id) override;
+    void commitChild(Identifier id, EntryIterator iter) override;
 
     LedgerStateEntry create(LedgerEntry const& entry) override;
 
@@ -294,7 +298,7 @@ class LedgerState : public AbstractLedgerState
 
     std::map<LedgerKey, LedgerEntry> getAllOffers() override;
 
-    std::shared_ptr<LedgerEntry>
+    std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  std::set<LedgerKey>&& exclude) override;
 
@@ -306,8 +310,6 @@ class LedgerState : public AbstractLedgerState
 
     std::map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset) override;
-
-    EntryIterator getEntryIterator() const override;
 
     LedgerHeader const& getHeader() const override;
 
@@ -345,7 +347,7 @@ class LedgerState : public AbstractLedgerState
 class LedgerStateRoot : public AbstractLedgerStateParent
 {
     class Impl;
-    std::unique_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> const mImpl;
 
   public:
     explicit LedgerStateRoot(Database& db, size_t entryCacheSize = 4096,
@@ -355,7 +357,7 @@ class LedgerStateRoot : public AbstractLedgerStateParent
 
     void addChild(AbstractLedgerState& child) override;
 
-    void commitChild(Identifier id) override;
+    void commitChild(Identifier id, EntryIterator iter) override;
 
     uint64_t countObjects(LedgerEntryType let) const;
     uint64_t countObjects(LedgerEntryType let, LedgerRange const& ledgers) const;
@@ -369,7 +371,7 @@ class LedgerStateRoot : public AbstractLedgerStateParent
 
     std::map<LedgerKey, LedgerEntry> getAllOffers() override;
 
-    std::shared_ptr<LedgerEntry>
+    std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  std::set<LedgerKey>&& exclude) override;
 

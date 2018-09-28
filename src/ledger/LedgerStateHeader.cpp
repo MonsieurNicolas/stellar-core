@@ -38,7 +38,7 @@ LedgerStateHeader::makeSharedImpl(AbstractLedgerState& ls,
 }
 
 LedgerStateHeader::LedgerStateHeader(std::shared_ptr<Impl> const& impl)
-    : mImpl(impl)
+    : mImpl(impl) // Constructing weak_ptr from shared_ptr is noexcept
 {
 }
 

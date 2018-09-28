@@ -45,6 +45,12 @@ isBetterOffer(LedgerEntry const& lhsEntry, LedgerEntry const& rhsEntry)
     }
 }
 
+// Implementation of LedgerStateRootFatalError --------------------------------
+LedgerStateRootFatalError::LedgerStateRootFatalError(std::string const& msg)
+    : std::runtime_error(msg)
+{
+}
+
 // Implementation of AbstractLedgerStateParent --------------------------------
 AbstractLedgerStateParent::~AbstractLedgerStateParent()
 {
@@ -57,44 +63,54 @@ AbstractLedgerStateParent::getIdentifier() const
 }
 
 // Implementation of EntryIterator --------------------------------------------
-AbstractLedgerState::EntryIterator::EntryIterator(std::unique_ptr<AbstractImpl>&& impl)
+EntryIterator::EntryIterator(std::unique_ptr<AbstractImpl>&& impl)
     : mImpl(std::move(impl))
 {
 }
 
-AbstractLedgerState::EntryIterator::EntryIterator(EntryIterator&& other)
+EntryIterator::EntryIterator(EntryIterator&& other)
     : mImpl(std::move(other.mImpl))
 {
 }
 
-AbstractLedgerState::EntryIterator&
-AbstractLedgerState::EntryIterator::operator++()
+std::unique_ptr<EntryIterator::AbstractImpl> const&
+EntryIterator::getImpl() const
 {
-    mImpl->advance();
+    if (!mImpl)
+    {
+        throw std::runtime_error("Iterator is empty");
+    }
+    return mImpl;
+}
+
+EntryIterator&
+EntryIterator::operator++()
+{
+    getImpl()->advance();
     return *this;
 }
 
-AbstractLedgerState::EntryIterator::operator bool() const
+EntryIterator::operator bool() const
 {
-    return !mImpl->atEnd();
+    return !getImpl()->atEnd();
 }
 
 LedgerEntry const&
-AbstractLedgerState::EntryIterator::entry() const
+EntryIterator::entry() const
 {
-    return mImpl->entry();
+    return getImpl()->entry();
 }
 
 bool
-AbstractLedgerState::EntryIterator::entryExists() const
+EntryIterator::entryExists() const
 {
-    return mImpl->entryExists();
+    return getImpl()->entryExists();
 }
 
 LedgerKey const&
-AbstractLedgerState::EntryIterator::key() const
+EntryIterator::key() const
 {
-    return mImpl->key();
+    return getImpl()->key();
 }
 
 // Implementation of AbstractLedgerState --------------------------------------
@@ -116,7 +132,8 @@ LedgerState::LedgerState(LedgerState& parent, bool shouldUpdateLastModified)
 
 LedgerState::Impl::Impl(LedgerState& self, AbstractLedgerStateParent& parent,
                         bool shouldUpdateLastModified)
-    : mParent(parent), mChild(nullptr), mHeader(mParent.getHeader())
+    : mParent(parent), mChild(nullptr)
+    , mHeader(std::make_unique<LedgerHeader>(mParent.getHeader()))
     , mShouldUpdateLastModified(shouldUpdateLastModified)
     , mIsSealed(false)
 {
@@ -131,10 +148,20 @@ LedgerState::~LedgerState()
     }
 }
 
+std::unique_ptr<LedgerState::Impl> const&
+LedgerState::getImpl() const
+{
+    if (!mImpl)
+    {
+        throw std::runtime_error("LedgerStateEntry was handled");
+    }
+    return mImpl;
+}
+
 void
 LedgerState::addChild(AbstractLedgerState& child)
 {
-    mImpl->addChild(child);
+    getImpl()->addChild(child);
 }
 
 void
@@ -144,7 +171,11 @@ LedgerState::Impl::addChild(AbstractLedgerState& child)
     checkNoChild();
 
     mChild = &child;
+
+    // std::set<...>::clear is noexcept
     mActive.clear();
+
+    // std::shared_ptr<...>::reset is noexcept
     mActiveHeader.reset();
 }
 
@@ -169,40 +200,45 @@ LedgerState::Impl::checkNotSealed() const
 void
 LedgerState::commit()
 {
-    mImpl->commit(getIdentifier());
+    getImpl()->commit(getIdentifier());
     mImpl.reset();
 }
 
 void
 LedgerState::Impl::commit(Identifier id)
 {
-    sealAndMaybeUpdateLastModified(); // Invokes checkNoChild
-
-    mActive.clear();
-    mActiveHeader.reset();
-    mParent.commitChild(id);
+    maybeUpdateLastModifiedThenInvokeThenSeal(
+        [&] (EntryMap const& entries) {
+            // getEntryIterator has the strong exception safety guarantee
+            // commitChild has the strong exception safety guarantee
+            mParent.commitChild(id, getEntryIterator(entries));
+        });
 }
 
 void
-LedgerState::commitChild(Identifier id)
+LedgerState::commitChild(Identifier id, EntryIterator iter)
 {
-    mImpl->commitChild();
+    getImpl()->commitChild(std::move(iter));
 }
 
 void
-LedgerState::Impl::commitChild()
+LedgerState::Impl::commitChild(EntryIterator iter)
 {
-    for (auto iter = mChild->getEntryIterator(); (bool)iter; ++iter)
+    // Assignment of xdrpp objects does not have the strong exception safety
+    // guarantee, so use std::unique_ptr<...>::swap to achieve it
+    auto childHeader = std::make_unique<LedgerHeader>(mChild->getHeader());
+
+    auto previousEntries = mEntry;
+    try
     {
-        auto const& key = iter.key();
-        if (iter.entryExists())
+        for (; (bool)iter; ++iter)
         {
-            mEntry[key] = std::make_shared<LedgerEntry>(iter.entry());
-        }
-        else
-        {
-            // TODO(jonjove): Check that this is correct
-            if (!mParent.getNewestVersion(key))
+            auto const& key = iter.key();
+            if (iter.entryExists())
+            {
+                mEntry[key] = std::make_shared<LedgerEntry>(iter.entry());
+            }
+            else if (!mParent.getNewestVersion(key))
             { // Created in this LedgerState
                 mEntry.erase(key);
             }
@@ -212,15 +248,21 @@ LedgerState::Impl::commitChild()
             }
         }
     }
-    mHeader = mChild->getHeader();
+    catch (...)
+    {
+        mEntry.swap(previousEntries);
+        throw;
+    }
 
+    // std::unique_ptr<...>::swap does not throw
+    mHeader.swap(childHeader);
     mChild = nullptr;
 }
 
 LedgerStateEntry
 LedgerState::create(LedgerEntry const& entry)
 {
-    return mImpl->create(*this, entry);
+    return getImpl()->create(*this, entry);
 }
 
 LedgerStateEntry
@@ -236,17 +278,25 @@ LedgerState::Impl::create(LedgerState& self, LedgerEntry const& entry)
     }
 
     auto current = std::make_shared<LedgerEntry>(entry);
-    mEntry[key] = current;
-
     auto impl = LedgerStateEntry::makeSharedImpl(self, *current);
+
+    // Set the key to active before constructing the LedgerStateEntry, as this
+    // can throw and the LedgerStateEntry destructor requires that mActive
+    // contains key. LedgerStateEntry constructor does not throw so this is
+    // still exception safe.
     mActive.emplace(key, toEntryImplBase(impl));
-    return LedgerStateEntry(impl);
+    LedgerStateEntry lse(impl);
+
+    // TODO(jonjove): Is std::map::operator[] exception safe?
+    // std::shared_ptr assignment is noexcept
+    mEntry[key] = current;
+    return lse;
 }
 
 void
 LedgerState::deactivate(LedgerKey const& key)
 {
-    mImpl->deactivate(key);
+    getImpl()->deactivate(key);
 }
 
 void
@@ -255,7 +305,7 @@ LedgerState::Impl::deactivate(LedgerKey const& key)
     auto iter = mActive.find(key);
     if (iter == mActive.end())
     {
-        throw std::runtime_error("Key does not exist");
+        throw std::runtime_error("Key is not active");
     }
     mActive.erase(iter);
 }
@@ -263,19 +313,23 @@ LedgerState::Impl::deactivate(LedgerKey const& key)
 void
 LedgerState::deactivateHeader()
 {
-    mImpl->deactivateHeader();
+    getImpl()->deactivateHeader();
 }
 
 void
 LedgerState::Impl::deactivateHeader()
 {
+    if (!mActiveHeader)
+    {
+        throw std::runtime_error("LedgerStateHeader is not active");
+    }
     mActiveHeader.reset();
 }
 
 void
 LedgerState::erase(LedgerKey const& key)
 {
-    mImpl->erase(key);
+    getImpl()->erase(key);
 }
 
 void
@@ -289,25 +343,45 @@ LedgerState::Impl::erase(LedgerKey const& key)
     {
         throw std::runtime_error("Key does not exist");
     }
-    if (mActive.find(key) != mActive.end())
-    {
-        throw std::runtime_error("Key is active");
-    }
+
+    auto activeIter = mActive.find(key);
+    bool isActive = activeIter != mActive.end();
 
     if (!mParent.getNewestVersion(key))
     { // Created in this LedgerState
-        mEntry.erase(key);
+        auto iter = mEntry.find(key);
+        mEntry.erase(iter);
     }
     else
     { // Existed in a previous LedgerState
-        mEntry[key] = nullptr;
+        auto iter = mEntry.find(key);
+        if (iter != mEntry.end())
+        {
+            iter->second.reset();
+        }
+        else
+        {
+            // C++14 requirements for exception safety of associative containers
+            // guarantee that if emplace throws when inserting a single element
+            // then the insertion has no effect
+            mEntry.emplace(key, nullptr);
+        }
+    }
+    // Note: Cannot throw after this point because the entry will not be
+    // deactivated in that case
+
+    if (isActive)
+    {
+        // C++14 requirements for exception safety of containers guarantee that
+        // erase(iter) does not throw
+        mActive.erase(activeIter);
     }
 }
 
 std::map<LedgerKey, LedgerEntry>
 LedgerState::getAllOffers()
 {
-    return mImpl->getAllOffers();
+    return getImpl()->getAllOffers();
 }
 
 std::map<LedgerKey, LedgerEntry>
@@ -332,20 +406,20 @@ LedgerState::Impl::getAllOffers()
     return offers;
 }
 
-std::shared_ptr<LedgerEntry>
+std::shared_ptr<LedgerEntry const>
 LedgerState::getBestOffer(Asset const& buying, Asset const& selling,
                           std::set<LedgerKey>&& exclude)
 {
-    return mImpl->getBestOffer(buying, selling, std::move(exclude));
+    return getImpl()->getBestOffer(buying, selling, std::move(exclude));
 }
 
-std::shared_ptr<LedgerEntry>
+std::shared_ptr<LedgerEntry const>
 LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
                                 std::set<LedgerKey>&& exclude)
 {
-    auto end = mEntry.end();
+    auto end = mEntry.cend();
     auto bestOfferIter = end;
-    for (auto iter = mEntry.begin(); iter != end; ++iter)
+    for (auto iter = mEntry.cbegin(); iter != end; ++iter)
     {
         auto const& key = iter->first;
         auto const& entry = iter->second;
@@ -372,10 +446,10 @@ LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
         }
     }
 
-    std::shared_ptr<LedgerEntry> bestOffer;
+    std::shared_ptr<LedgerEntry const> bestOffer;
     if (bestOfferIter != end)
     {
-        bestOffer = std::make_shared<LedgerEntry>(*bestOfferIter->second);
+        bestOffer = std::make_shared<LedgerEntry const>(*bestOfferIter->second);
     }
 
     auto parentBestOffer = mParent.getBestOffer(buying, selling, std::move(exclude));
@@ -393,130 +467,127 @@ LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
 LedgerEntryChanges
 LedgerState::getChanges()
 {
-    return mImpl->getChanges();
+    return getImpl()->getChanges();
 }
 
 LedgerEntryChanges
 LedgerState::Impl::getChanges()
 {
-    sealAndMaybeUpdateLastModified(); // Invokes checkNoChild
-
     LedgerEntryChanges changes;
-    for (auto const& kv : mEntry)
-    {
-        auto const& key = kv.first;
-        auto const& entry = kv.second;
-
-        auto previous = mParent.getNewestVersion(key);
-        if (previous)
-        {
-            changes.emplace_back(LEDGER_ENTRY_STATE);
-            changes.back().state() = *previous;
-
-            if (entry)
+    maybeUpdateLastModifiedThenInvokeThenSeal(
+        [&] (EntryMap const& entries) {
+            for (auto const& kv : entries)
             {
-                changes.emplace_back(LEDGER_ENTRY_UPDATED);
-                changes.back().updated() = *entry;
+                auto const& key = kv.first;
+                auto const& entry = kv.second;
+
+                auto previous = mParent.getNewestVersion(key);
+                if (previous)
+                {
+                    changes.emplace_back(LEDGER_ENTRY_STATE);
+                    changes.back().state() = *previous;
+
+                    if (entry)
+                    {
+                        changes.emplace_back(LEDGER_ENTRY_UPDATED);
+                        changes.back().updated() = *entry;
+                    }
+                    else
+                    {
+                        changes.emplace_back(LEDGER_ENTRY_REMOVED);
+                        changes.back().removed() = key;
+                    }
+                }
+                else
+                {
+                    // If !entry and !previous.entry then the entry was created and
+                    // erased in this LedgerState, in which case it should not still be
+                    // in this LedgerState
+                    assert(entry);
+                    changes.emplace_back(LEDGER_ENTRY_CREATED);
+                    changes.back().created() = *entry;
+                }
             }
-            else
-            {
-                changes.emplace_back(LEDGER_ENTRY_REMOVED);
-                changes.back().removed() = key;
-            }
-        }
-        else
-        {
-            // If !entry and !previous.entry then the entry was created and
-            // erased in this LedgerState, in which case it should not still be
-            // in mEntry
-            assert(entry);
-            changes.emplace_back(LEDGER_ENTRY_CREATED);
-            changes.back().created() = *entry;
-        }
-    }
+        });
     return changes;
 }
 
 std::vector<LedgerKey>
 LedgerState::getDeadEntries()
 {
-    return mImpl->getDeadEntries();
+    return getImpl()->getDeadEntries();
 }
 
 std::vector<LedgerKey>
 LedgerState::Impl::getDeadEntries()
 {
-    sealAndMaybeUpdateLastModified(); // Invokes checkNoChild
-
     std::vector<LedgerKey> res;
-    for (auto const& kv : mEntry)
-    {
-        auto const& key = kv.first;
-        auto const& entry = kv.second;
-        if (!entry)
-        {
-            res.push_back(key);
-        }
-    }
+    maybeUpdateLastModifiedThenInvokeThenSeal(
+        [&res] (EntryMap const& entries) {
+            for (auto const& kv : entries)
+            {
+                auto const& key = kv.first;
+                auto const& entry = kv.second;
+                if (!entry)
+                {
+                    res.push_back(key);
+                }
+            }
+        });
     return res;
 }
 
 LedgerStateDelta
 LedgerState::getDelta()
 {
-    return mImpl->getDelta();
+    return getImpl()->getDelta();
 }
 
 LedgerStateDelta
 LedgerState::Impl::getDelta()
 {
-    sealAndMaybeUpdateLastModified(); // Invokes checkNoChild
-
     LedgerStateDelta delta;
-    for (auto const& kv : mEntry)
-    {
-        auto const& key = kv.first;
-        auto previous = mParent.getNewestVersion(key);
+    maybeUpdateLastModifiedThenInvokeThenSeal(
+        [&] (EntryMap const& entries) {
+            for (auto const& kv : entries)
+            {
+                auto const& key = kv.first;
+                auto previous = mParent.getNewestVersion(key);
 
-        // Deep copy is not required here because getDelta causes LedgerState
-        // to enter the sealed state, meaning subsequent modifications are
-        // impossible.
-        delta.entry[key] = {kv.second, previous};
-    }
-
-    delta.header = {mHeader, mParent.getHeader()};
+                // Deep copy is not required here because getDelta causes LedgerState
+                // to enter the sealed state, meaning subsequent modifications are
+                // impossible.
+                delta.entry[key] = {kv.second, previous};
+            }
+            delta.header = {*mHeader, mParent.getHeader()};
+        });
     return delta;
 }
 
-AbstractLedgerState::EntryIterator
-LedgerState::getEntryIterator() const
+EntryIterator
+LedgerState::Impl::getEntryIterator(EntryMap const& entries) const
 {
-    return mImpl->getEntryIterator();
-}
-
-AbstractLedgerState::EntryIterator
-LedgerState::Impl::getEntryIterator() const
-{
-    auto iterImpl = std::make_unique<EntryIteratorImpl>(mEntry.begin(), mEntry.end());
-    return AbstractLedgerState::EntryIterator(std::move(iterImpl));
+    auto iterImpl =
+        std::make_unique<EntryIteratorImpl>(entries.cbegin(), entries.cend());
+    return EntryIterator(std::move(iterImpl));
 }
 
 LedgerHeader const&
 LedgerState::getHeader() const
 {
-    return mImpl->getHeader();
+    return getImpl()->getHeader();
 }
 
 LedgerHeader const&
 LedgerState::Impl::getHeader() const
 {
-    return mHeader;
+    return *mHeader;
 }
 
 std::vector<InflationWinner>
 LedgerState::getInflationWinners(size_t maxWinners, int64_t minVotes)
 {
-    return mImpl->getInflationWinners(maxWinners, minVotes);
+    return getImpl()->getInflationWinners(maxWinners, minVotes);
 }
 
 std::map<AccountID, int64_t>
@@ -563,7 +634,7 @@ LedgerState::Impl::getTotalVotes(
     std::map<AccountID, int64_t> totalVotes;
     for (auto const& winner : parentWinners)
     {
-        totalVotes[winner.accountID] = winner.votes;
+        totalVotes.emplace(winner.accountID, winner.votes);
     }
     for (auto const& delta : deltaVotes)
     {
@@ -620,7 +691,7 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     // Have to load extra winners corresponding to the number of accounts that
     // have had their vote totals change
     size_t numChanged =
-        std::count_if(deltaVotes.begin(), deltaVotes.end(),
+        std::count_if(deltaVotes.cbegin(), deltaVotes.cend(),
             [] (auto const& val) {
                 return val.second != 0;
             });
@@ -629,7 +700,7 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     // Have to load accounts that could be winners after accounting for the
     // change in their vote totals
     int64_t maxIncrease =
-        std::max_element(deltaVotes.begin(), deltaVotes.end(),
+        std::max_element(deltaVotes.cbegin(), deltaVotes.cend(),
             [] (auto const& lhs, auto const& rhs) {
                return lhs.second < rhs.second;
             })->second;
@@ -651,30 +722,31 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
 std::vector<LedgerEntry>
 LedgerState::getLiveEntries()
 {
-    return mImpl->getLiveEntries();
+    return getImpl()->getLiveEntries();
 }
 
 std::vector<LedgerEntry>
 LedgerState::Impl::getLiveEntries()
 {
-    sealAndMaybeUpdateLastModified(); // Invokes checkNoChild
-
     std::vector<LedgerEntry> res;
-    for (auto const& kv : mEntry)
-    {
-        auto const& entry = kv.second;
-        if (entry)
-        {
-            res.push_back(*entry);
-        }
-    }
+    maybeUpdateLastModifiedThenInvokeThenSeal(
+        [&res] (EntryMap const& entries) {
+            for (auto const& kv : entries)
+            {
+                auto const& entry = kv.second;
+                if (entry)
+                {
+                    res.push_back(*entry);
+                }
+            }
+        });
     return res;
 }
 
 std::shared_ptr<LedgerEntry const>
 LedgerState::getNewestVersion(LedgerKey const& key) const
 {
-    return mImpl->getNewestVersion(key);
+    return getImpl()->getNewestVersion(key);
 }
 
 std::shared_ptr<LedgerEntry const>
@@ -692,7 +764,7 @@ std::map<LedgerKey, LedgerEntry>
 LedgerState::getOffersByAccountAndAsset(AccountID const& account,
                                         Asset const& asset)
 {
-    return mImpl->getOffersByAccountAndAsset(account, asset);
+    return getImpl()->getOffersByAccountAndAsset(account, asset);
 }
 
 std::map<LedgerKey, LedgerEntry>
@@ -727,7 +799,7 @@ LedgerState::Impl::getOffersByAccountAndAsset(AccountID const& account,
 LedgerStateEntry
 LedgerState::load(LedgerKey const& key)
 {
-    return mImpl->load(*this, key);
+    return getImpl()->load(*this, key);
 }
 
 LedgerStateEntry
@@ -747,37 +819,60 @@ LedgerState::Impl::load(LedgerState& self, LedgerKey const& key)
     }
 
     auto current = std::make_shared<LedgerEntry>(*newest);
-    mEntry[key] = current;
-
     auto impl = LedgerStateEntry::makeSharedImpl(self, *current);
+
+    // Set the key to active before constructing the LedgerStateEntry, as this
+    // can throw and the LedgerStateEntry destructor requires that mActive
+    // contains key. LedgerStateEntry constructor does not throw so this is
+    // still exception safe.
     mActive.emplace(key, toEntryImplBase(impl));
-    return LedgerStateEntry(impl);
+    LedgerStateEntry lse(impl);
+
+    // TODO(jonjove): Is std::map::operator[] exception safe?
+    // std::shared_ptr assignment is noexcept
+    mEntry[key] = current;
+    return lse;
 }
 
 std::map<AccountID, std::vector<LedgerStateEntry>>
 LedgerState::loadAllOffers()
 {
-    return mImpl->loadAllOffers(*this);
+    return getImpl()->loadAllOffers(*this);
 }
 
 std::map<AccountID, std::vector<LedgerStateEntry>>
 LedgerState::Impl::loadAllOffers(LedgerState& self)
 {
+    checkNotSealed();
+    checkNoChild();
+
+    auto previousEntries = mEntry;
     auto offers = getAllOffers();
-    std::map<AccountID, std::vector<LedgerStateEntry>> offersByAccount;
-    for (auto const& kv : offers)
+    try
     {
-        auto const& key = kv.first;
-        auto const& sellerID = key.offer().sellerID;
-        offersByAccount[sellerID].emplace_back(load(self, key));
+        std::map<AccountID, std::vector<LedgerStateEntry>> offersByAccount;
+        for (auto const& kv : offers)
+        {
+            auto const& key = kv.first;
+            auto const& sellerID = key.offer().sellerID;
+            offersByAccount[sellerID].emplace_back(load(self, key));
+        }
+        return offersByAccount;
     }
-    return offersByAccount;
+    catch (...)
+    {
+        // For associative containers, swap does not throw unless the exception
+        // is thrown by the swap of the Compare object (which is of type
+        // std::less<LedgerKey>, so this should not throw when swapped)
+        mEntry.swap(previousEntries);
+        throw;
+    }
 }
 
 LedgerStateEntry
 LedgerState::loadBestOffer(Asset const& buying, Asset const& selling)
 {
-    return mImpl->loadBestOffer(*this, buying, selling);
+    return getImpl()->loadBestOffer(*this, buying, selling);
 }
 
 LedgerStateEntry
@@ -794,7 +889,7 @@ LedgerState::Impl::loadBestOffer(LedgerState& self, Asset const& buying,
 LedgerStateHeader
 LedgerState::loadHeader()
 {
-    return mImpl->loadHeader(*this);
+    return getImpl()->loadHeader(*this);
 }
 
 LedgerStateHeader
@@ -807,7 +902,11 @@ LedgerState::Impl::loadHeader(LedgerState& self)
         throw std::runtime_error("LedgerStateHeader is active");
     }
 
-    mActiveHeader = LedgerStateHeader::makeSharedImpl(self, mHeader);
+    // Set the key to active before constructing the LedgerStateHeader, as this
+    // can throw and the LedgerStateHeader destructor requires that
+    // mActiveHeader is not empty. LedgerStateHeader constructor does not throw
+    // so this is still exception safe.
+    mActiveHeader = LedgerStateHeader::makeSharedImpl(self, *mHeader);
     return LedgerStateHeader(mActiveHeader);
 }
 
@@ -815,7 +914,7 @@ std::vector<LedgerStateEntry>
 LedgerState::loadOffersByAccountAndAsset(AccountID const& accountID,
                                          Asset const& asset)
 {
-    return mImpl->loadOffersByAccountAndAsset(*this, accountID, asset);
+    return getImpl()->loadOffersByAccountAndAsset(*this, accountID, asset);
 }
 
 std::vector<LedgerStateEntry>
@@ -826,20 +925,32 @@ LedgerState::Impl::loadOffersByAccountAndAsset(LedgerState& self,
     checkNotSealed();
     checkNoChild();
 
-    std::vector<LedgerStateEntry> res;
+    auto previousEntries = mEntry;
     auto offers = getOffersByAccountAndAsset(accountID, asset);
-    for (auto const& kv : offers)
+    try
     {
-        auto const& key = kv.first;
-        res.emplace_back(load(self, key));
+        std::vector<LedgerStateEntry> res;
+        for (auto const& kv : offers)
+        {
+            auto const& key = kv.first;
+            res.emplace_back(load(self, key));
+        }
+        return res;
     }
-    return res;
+    catch (...)
+    {
+        // For associative containers, swap does not throw unless the exception
+        // is thrown by the swap of the Compare object (which is of type
+        // std::less<LedgerKey>, so this should not throw when swapped)
+        mEntry.swap(previousEntries);
+        throw;
+    }
 }
 
 ConstLedgerStateEntry
 LedgerState::loadWithoutRecord(LedgerKey const& key)
 {
-    return mImpl->loadWithoutRecord(*this, key);
+    return getImpl()->loadWithoutRecord(*this, key);
 }
 
 ConstLedgerStateEntry
@@ -859,6 +970,11 @@ LedgerState::Impl::loadWithoutRecord(LedgerState& self, LedgerKey const& key)
     }
 
     auto impl = ConstLedgerStateEntry::makeSharedImpl(self, *newest);
+
+    // Set the key to active before constructing the ConstLedgerStateEntry, as
+    // this can throw and the LedgerStateEntry destructor requires that mActive
+    // contains key. ConstLedgerStateEntry constructor does not throw so this is
+    // still exception safe.
     mActive.emplace(key, toEntryImplBase(impl));
     return ConstLedgerStateEntry(impl);
 }
@@ -866,7 +982,7 @@ LedgerState::Impl::loadWithoutRecord(LedgerState& self, LedgerKey const& key)
 void
 LedgerState::rollback()
 {
-    mImpl->rollback(getIdentifier());
+    getImpl()->rollback(getIdentifier());
     mImpl.reset();
 }
 
@@ -887,7 +1003,7 @@ LedgerState::Impl::rollback(Identifier id)
 void
 LedgerState::rollbackChild(Identifier id)
 {
-    mImpl->rollbackChild();
+    getImpl()->rollbackChild();
 }
 
 void
@@ -899,7 +1015,7 @@ LedgerState::Impl::rollbackChild()
 void
 LedgerState::unsealHeader(std::function<void(LedgerHeader&)> f)
 {
-    mImpl->unsealHeader(*this, f);
+    getImpl()->unsealHeader(*this, f);
 }
 
 void
@@ -915,31 +1031,95 @@ LedgerState::Impl::unsealHeader(
         throw std::runtime_error("LedgerStateHeader is active");
     }
 
-    mActiveHeader = LedgerStateHeader::makeSharedImpl(self, mHeader);
+    mActiveHeader = LedgerStateHeader::makeSharedImpl(self, *mHeader);
     LedgerStateHeader header(mActiveHeader);
     f(header.current());
 }
 
-void
-LedgerState::Impl::sealAndMaybeUpdateLastModified()
+LedgerState::Impl::EntryMap
+LedgerState::Impl::maybeUpdateLastModified() const
 {
+    checkNotSealed();
     checkNoChild();
 
-    mIsSealed = true;
-    mActive.clear();
-    mActiveHeader.reset();
-
+    auto entries = mEntry;
     if (mShouldUpdateLastModified)
     {
-        for (auto& kv : mEntry)
+        for (auto& kv : entries)
         {
             auto& entry = kv.second;
             if (entry)
             {
-                entry->lastModifiedLedgerSeq = mHeader.ledgerSeq;
+                entry->lastModifiedLedgerSeq = mHeader->ledgerSeq;
             }
         }
     }
+    return entries;
+}
+
+void
+LedgerState::Impl::maybeUpdateLastModifiedThenInvokeThenSeal(
+    std::function<void(EntryMap const&)> f)
+{
+    if (!mIsSealed)
+    {
+        // Invokes checkNoChild and checkNotSealed
+        auto entries = maybeUpdateLastModified();
+
+        f(entries);
+
+        // For associative containers, swap does not throw unless the exception
+        // is thrown by the swap of the Compare object (which is of type
+        // std::less<LedgerKey>, so this should not throw when swapped)
+        mEntry.swap(entries);
+
+        // std::set<...>::clear does not throw
+        // std::shared_ptr<...>::reset does not throw
+        mActive.clear();
+        mActiveHeader.reset();
+        mIsSealed = true;
+    }
+    else // Note: can't have child if sealed
+    {
+        f(mEntry);
+    }
+}
+
+// Implementation of LedgerState::Impl::EntryIteratorImpl ---------------------
+LedgerState::Impl::EntryIteratorImpl::EntryIteratorImpl(
+        IteratorType const& begin, IteratorType const& end)
+    : mIter(begin), mEnd(end)
+{
+}
+
+void
+LedgerState::Impl::EntryIteratorImpl::advance()
+{
+    ++mIter;
+}
+
+bool
+LedgerState::Impl::EntryIteratorImpl::atEnd() const
+{
+    return mIter == mEnd;
+}
+
+LedgerEntry const&
+LedgerState::Impl::EntryIteratorImpl::entry() const
+{
+    return *(mIter->second);
+}
+
+bool
+LedgerState::Impl::EntryIteratorImpl::entryExists() const
+{
+    return (bool)(mIter->second);
+}
+
+LedgerKey const&
+LedgerState::Impl::EntryIteratorImpl::key() const
+{
+    return mIter->first;
 }
 
 // Implementation of LedgerStateRoot ------------------------------------------
@@ -951,16 +1131,25 @@ LedgerStateRoot::LedgerStateRoot(Database& db, size_t entryCacheSize,
 
 LedgerStateRoot::Impl::Impl(Database& db, size_t entryCacheSize,
                             size_t bestOfferCacheSize)
-    : mDatabase(db), mEntryCacheSize(entryCacheSize)
-    , mEntryCache(std::make_unique<EntryCacheType>(mEntryCacheSize))
+    : mDatabase(db), mHeader(std::make_unique<LedgerHeader>())
+    , mEntryCacheSize(entryCacheSize)
+    , mEntryCache(std::make_unique<EntryCache>(mEntryCacheSize))
     , mBestOffersCache(
-            std::make_unique<BestOffersCacheType>(bestOfferCacheSize))
+            std::make_unique<BestOffersCache>(bestOfferCacheSize))
     , mChild(nullptr)
 {
 }
 
 LedgerStateRoot::~LedgerStateRoot()
 {
+}
+
+LedgerStateRoot::Impl::~Impl()
+{
+    if (mChild)
+    {
+        mChild->rollback();
+    }
 }
 
 void
@@ -976,8 +1165,8 @@ LedgerStateRoot::Impl::addChild(AbstractLedgerState& child)
     {
         throw std::runtime_error("LedgerStateRoot already has child");
     }
-    mChild = &child;
     mTransaction = std::make_unique<soci::transaction>(mDatabase.getSession());
+    mChild = &child;
 }
 
 void
@@ -990,21 +1179,21 @@ LedgerStateRoot::Impl::checkNoChild() const
 }
 
 void
-LedgerStateRoot::commitChild(Identifier id)
+LedgerStateRoot::commitChild(Identifier id, EntryIterator iter)
 {
-    mImpl->commitChild();
+    mImpl->commitChild(std::move(iter));
 }
 
 void
-LedgerStateRoot::Impl::commitChild()
+LedgerStateRoot::Impl::commitChild(EntryIterator iter)
 {
-    auto header = mChild->getHeader();
-
-    mBestOffersCache->clear();
+    // Assignment of xdrpp objects does not have the strong exception safety
+    // guarantee, so use std::unique_ptr<...>::swap to achieve it
+    auto childHeader = std::make_unique<LedgerHeader>(mChild->getHeader());
 
     try
     {
-        for (auto iter = mChild->getEntryIterator(); (bool)iter; ++iter)
+        for (; (bool)iter; ++iter)
         {
             auto const& key = iter.key();
             switch (key.type())
@@ -1024,23 +1213,26 @@ LedgerStateRoot::Impl::commitChild()
             default:
                 throw std::runtime_error("Unknown key type");
             }
-            auto cacheKey = binToHex(xdr::xdr_to_opaque(key));
-            mEntryCache->put(cacheKey, iter.entryExists()
-                ? std::make_shared<LedgerEntry const>(iter.entry()) : nullptr);
         }
+
+        mTransaction->commit();
+        mDatabase.clearPreparedStatementCache();
     }
     catch (...)
     {
-        mEntryCache = std::make_unique<EntryCacheType>(mEntryCacheSize);
-        throw;
+        throw LedgerStateRootFatalError("LedgerStateRoot could not commit to database");
     }
 
-    mTransaction->commit();
-    mTransaction.reset();
-    mChild = nullptr;
-    mHeader = header;
+    // Clearing the cache does not throw
+    mBestOffersCache->clear();
+    mEntryCache->clear();
 
-    mDatabase.clearPreparedStatementCache();
+    // std::unique_ptr<...>::reset does not throw
+    mTransaction.reset();
+
+    // std::unique_ptr<...>::swap does not throw
+    mHeader.swap(childHeader);
+    mChild = nullptr;
 }
 
 std::string
@@ -1168,66 +1360,82 @@ LedgerStateRoot::getAllOffers()
 std::map<LedgerKey, LedgerEntry>
 LedgerStateRoot::Impl::getAllOffers()
 {
-    auto offers = loadAllOffers();
-    std::map<LedgerKey, LedgerEntry> offersByAccount;
+    std::vector<LedgerEntry> offers;
+    try
+    {
+        offers = loadAllOffers();
+    }
+    catch (...)
+    {
+        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+    }
+
+    std::map<LedgerKey, LedgerEntry> offersByKey;
     for (auto const& offer : offers)
     {
-        offersByAccount[LedgerEntryKey(offer)] = offer;
+        offersByKey.emplace(LedgerEntryKey(offer), offer);
     }
-    return offersByAccount;
+    return offersByKey;
 }
 
-std::shared_ptr<LedgerEntry>
+std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::getBestOffer(Asset const& buying, Asset const& selling,
                               std::set<LedgerKey>&& exclude)
 {
     return mImpl->getBestOffer(buying, selling, std::move(exclude));
 }
 
-std::shared_ptr<LedgerEntry>
+static std::shared_ptr<LedgerEntry const>
+findIncludedOffer(std::list<LedgerEntry>::const_iterator iter,
+                  std::list<LedgerEntry>::const_iterator const& end,
+                  std::set<LedgerKey> const& exclude)
+{
+    for ( ; iter != end; ++iter)
+    {
+        auto key = LedgerEntryKey(*iter);
+        if (exclude.find(key) == exclude.end())
+        {
+            return std::make_shared<LedgerEntry const>(*iter);
+        }
+    }
+    return {};
+}
+
+std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
                                     std::set<LedgerKey>&& exclude)
 {
-    std::string cacheKey = binToHex(xdr::xdr_to_opaque(buying))
-                         + binToHex(xdr::xdr_to_opaque(selling));
+    auto cacheKey = getBestOffersCacheKey(buying, selling);
     if (!mBestOffersCache->exists(cacheKey))
     {
-        mBestOffersCache->put(cacheKey, {{}, false});
+        putInBestOffersCache(cacheKey, {{}, false});
     }
-    auto& cached = mBestOffersCache->get(cacheKey);
-
+    auto& cached = getFromBestOffersCache(cacheKey);
     auto& offers = cached.bestOffers;
-    for (auto const& offer : offers)
-    {
-        auto key = LedgerEntryKey(offer);
-        if (exclude.find(key) == exclude.end())
-        {
-            return std::make_shared<LedgerEntry>(offer);
-        }
-    }
+
+    auto res = findIncludedOffer(offers.cbegin(), offers.cend(), exclude);
 
     size_t const BATCH_SIZE = 5;
-    while (!cached.allLoaded)
+    while (!res && !cached.allLoaded)
     {
-        auto newOffers =
-            loadBestOffers(buying, selling, BATCH_SIZE, offers.size());
-        if (newOffers.size() < BATCH_SIZE)
+        std::list<LedgerEntry>::const_iterator newOfferIter;
+        try
+        {
+            newOfferIter =
+                loadBestOffers(offers, buying, selling, BATCH_SIZE, offers.size());
+        }
+        catch (...)
+        {
+            throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+        }
+
+        if (std::distance(newOfferIter, offers.cend()) < BATCH_SIZE)
         {
             cached.allLoaded = true;
         }
-
-        offers.insert(offers.end(), newOffers.begin(), newOffers.end());
-        for (auto const& offer : newOffers)
-        {
-            auto key = LedgerEntryKey(offer);
-            if (exclude.find(key) == exclude.end())
-            {
-                return std::make_shared<LedgerEntry>(offer);
-            }
-        }
+        res = findIncludedOffer(newOfferIter, offers.cend(), exclude);
     }
-
-    return {};
+    return res;
 }
 
 std::map<LedgerKey, LedgerEntry>
@@ -1241,8 +1449,17 @@ std::map<LedgerKey, LedgerEntry>
 LedgerStateRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
                                                   Asset const& asset)
 {
+    std::vector<LedgerEntry> offers;
+    try
+    {
+        offers = loadOffersByAccountAndAsset(account, asset);
+    }
+    catch (...)
+    {
+        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+    }
+
     std::map<LedgerKey, LedgerEntry> res;
-    auto offers = loadOffersByAccountAndAsset(account, asset);
     for (auto const& offer : offers)
     {
         res.emplace(LedgerEntryKey(offer), offer);
@@ -1259,7 +1476,7 @@ LedgerStateRoot::getHeader() const
 LedgerHeader const&
 LedgerStateRoot::Impl::getHeader() const
 {
-    return mHeader;
+    return *mHeader;
 }
 
 std::vector<InflationWinner>
@@ -1271,7 +1488,14 @@ LedgerStateRoot::getInflationWinners(size_t maxWinners, int64_t minVotes)
 std::vector<InflationWinner>
 LedgerStateRoot::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
 {
-    return loadInflationWinners(maxWinners, minVotes);
+    try
+    {
+        return loadInflationWinners(maxWinners, minVotes);
+    }
+    catch (...)
+    {
+        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+    }
 }
 
 std::shared_ptr<LedgerEntry const>
@@ -1283,14 +1507,14 @@ LedgerStateRoot::getNewestVersion(LedgerKey const& key) const
 std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
 {
-    std::shared_ptr<LedgerEntry const> entry;
-    auto cacheKey = binToHex(xdr::xdr_to_opaque(key));
+    auto cacheKey = getEntryCacheKey(key);
     if (mEntryCache->exists(cacheKey))
     {
-        auto ptr = mEntryCache->get(cacheKey);
-        entry = ptr ? std::make_shared<LedgerEntry const>(*ptr.get()) : nullptr;
+        return getFromEntryCache(cacheKey);
     }
-    else
+
+    std::shared_ptr<LedgerEntry const> entry;
+    try
     {
         switch (key.type())
         {
@@ -1309,9 +1533,13 @@ LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
         default:
             throw std::runtime_error("Unknown key type");
         }
-        mEntryCache->put(cacheKey, entry);
+    }
+    catch (...)
+    {
+        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
     }
 
+    putInEntryCache(cacheKey, entry);
     return entry;
 }
 
@@ -1324,13 +1552,21 @@ LedgerStateRoot::rollbackChild(Identifier id)
 void
 LedgerStateRoot::Impl::rollbackChild()
 {
-    mTransaction->rollback();
-    mTransaction.reset();
+    try
+    {
+        mTransaction->rollback();
+        mTransaction.reset();
+    }
+    catch (...)
+    {
+        throw LedgerStateRootFatalError("LedgerStateRoot could not rollback");
+    }
+
     mChild = nullptr;
 }
 
 void
-LedgerStateRoot::Impl::storeAccount(AbstractLedgerState::EntryIterator const& iter)
+LedgerStateRoot::Impl::storeAccount(EntryIterator const& iter)
 {
     if (iter.entryExists())
     {
@@ -1345,7 +1581,7 @@ LedgerStateRoot::Impl::storeAccount(AbstractLedgerState::EntryIterator const& it
 }
 
 void
-LedgerStateRoot::Impl::storeData(AbstractLedgerState::EntryIterator const& iter)
+LedgerStateRoot::Impl::storeData(EntryIterator const& iter)
 {
     if (iter.entryExists())
     {
@@ -1359,7 +1595,7 @@ LedgerStateRoot::Impl::storeData(AbstractLedgerState::EntryIterator const& iter)
 }
 
 void
-LedgerStateRoot::Impl::storeOffer(AbstractLedgerState::EntryIterator const& iter)
+LedgerStateRoot::Impl::storeOffer(EntryIterator const& iter)
 {
     if (iter.entryExists())
     {
@@ -1373,7 +1609,7 @@ LedgerStateRoot::Impl::storeOffer(AbstractLedgerState::EntryIterator const& iter
 }
 
 void
-LedgerStateRoot::Impl::storeTrustLine(AbstractLedgerState::EntryIterator const& iter)
+LedgerStateRoot::Impl::storeTrustLine(EntryIterator const& iter)
 {
     if (iter.entryExists())
     {
@@ -1383,6 +1619,80 @@ LedgerStateRoot::Impl::storeTrustLine(AbstractLedgerState::EntryIterator const& 
     else
     {
         deleteTrustLine(iter.key());
+    }
+}
+
+LedgerStateRoot::Impl::EntryCacheKey
+LedgerStateRoot::Impl::getEntryCacheKey(LedgerKey const& key) const
+{
+    return binToHex(xdr::xdr_to_opaque(key));
+}
+
+std::shared_ptr<LedgerEntry const>
+LedgerStateRoot::Impl::getFromEntryCache(EntryCacheKey const& cacheKey) const
+{
+    try
+    {
+        return mEntryCache->get(cacheKey);
+    }
+    catch (...)
+    {
+        mEntryCache->clear();
+        throw;
+    }
+}
+
+void
+LedgerStateRoot::Impl::putInEntryCache(
+    EntryCacheKey const& cacheKey,
+    std::shared_ptr<LedgerEntry const> const& entry) const
+{
+    try
+    {
+        mEntryCache->put(cacheKey, entry);
+    }
+    catch (...)
+    {
+        mEntryCache->clear();
+        throw;
+    }
+}
+
+LedgerStateRoot::Impl::EntryCacheKey
+LedgerStateRoot::Impl::getBestOffersCacheKey(Asset const& buying,
+                                             Asset const& selling) const
+{
+    return binToHex(xdr::xdr_to_opaque(buying))
+           + binToHex(xdr::xdr_to_opaque(selling));
+}
+
+LedgerStateRoot::Impl::BestOffersCacheEntry&
+LedgerStateRoot::Impl::getFromBestOffersCache(
+    BestOffersCacheKey const& cacheKey) const
+{
+    try
+    {
+        return mBestOffersCache->get(cacheKey);
+    }
+    catch (...)
+    {
+        mBestOffersCache->clear();
+        throw;
+    }
+}
+
+void
+LedgerStateRoot::Impl::putInBestOffersCache(
+    BestOffersCacheKey const& cacheKey, BestOffersCacheEntry const& entry) const
+{
+    try
+    {
+        mBestOffersCache->put(cacheKey, entry);
+    }
+    catch (...)
+    {
+        mBestOffersCache->clear();
+        throw;
     }
 }
 }

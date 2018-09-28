@@ -92,8 +92,9 @@ LedgerStateRoot::Impl::loadAllOffers() const
     return offers;
 }
 
-std::vector<LedgerEntry>
-LedgerStateRoot::Impl::loadBestOffers(Asset const& buying, Asset const& selling,
+std::list<LedgerEntry>::const_iterator
+LedgerStateRoot::Impl::loadBestOffers(std::list<LedgerEntry>& offers,
+                                      Asset const& buying, Asset const& selling,
                                       size_t numOffers, size_t offset) const
 {
     std::string sql = "SELECT sellerid, offerid, "
@@ -171,12 +172,10 @@ LedgerStateRoot::Impl::loadBestOffers(Asset const& buying, Asset const& selling,
     st.exchange(soci::use(numOffers, "n"));
     st.exchange(soci::use(offset, "o"));
 
-    std::vector<LedgerEntry> offers;
     {
         auto timer = mDatabase.getSelectTimer("offer");
-        offers = loadOffers(prep);
+        return loadOffers(prep, offers);
     }
-    return offers;
 }
 
 // Note: This function is currently only used in AllowTrustOpFrame, which means
@@ -276,6 +275,56 @@ LedgerStateRoot::Impl::loadOffers(StatementContext& prep) const
     }
 
     return offers;
+}
+
+std::list<LedgerEntry>::const_iterator
+LedgerStateRoot::Impl::loadOffers(StatementContext& prep,
+                                  std::list<LedgerEntry>& offers) const
+{
+    auto iterNext = --offers.cend();
+
+    std::string actIDStrKey;
+    unsigned int sellingAssetType, buyingAssetType;
+    std::string sellingAssetCode, buyingAssetCode, sellingIssuerStrKey,
+        buyingIssuerStrKey;
+    soci::indicator sellingAssetCodeIndicator, buyingAssetCodeIndicator,
+        sellingIssuerIndicator, buyingIssuerIndicator;
+
+    LedgerEntry le;
+    le.data.type(OFFER);
+    OfferEntry& oe = le.data.offer();
+
+    auto& st = prep.statement();
+    st.exchange(soci::into(actIDStrKey));
+    st.exchange(soci::into(oe.offerID));
+    st.exchange(soci::into(sellingAssetType));
+    st.exchange(soci::into(sellingAssetCode, sellingAssetCodeIndicator));
+    st.exchange(soci::into(sellingIssuerStrKey, sellingIssuerIndicator));
+    st.exchange(soci::into(buyingAssetType));
+    st.exchange(soci::into(buyingAssetCode, buyingAssetCodeIndicator));
+    st.exchange(soci::into(buyingIssuerStrKey, buyingIssuerIndicator));
+    st.exchange(soci::into(oe.amount));
+    st.exchange(soci::into(oe.price.n));
+    st.exchange(soci::into(oe.price.d));
+    st.exchange(soci::into(oe.flags));
+    st.exchange(soci::into(le.lastModifiedLedgerSeq));
+    st.define_and_bind();
+    st.execute(true);
+    while (st.got_data())
+    {
+        oe.sellerID = KeyUtils::fromStrKey<PublicKey>(actIDStrKey);
+        processAsset(oe.selling, (AssetType)sellingAssetType,
+                     sellingIssuerStrKey, sellingIssuerIndicator,
+                     sellingAssetCode, sellingAssetCodeIndicator);
+        processAsset(oe.buying, (AssetType)buyingAssetType, buyingIssuerStrKey,
+                     buyingIssuerIndicator, buyingAssetCode,
+                     buyingAssetCodeIndicator);
+
+        offers.emplace_back(le);
+        st.fetch();
+    }
+
+    return ++iterNext;
 }
 
 void

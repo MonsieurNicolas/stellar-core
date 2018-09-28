@@ -18,8 +18,7 @@ class LedgerStateEntry::Impl : public EntryImplBase
     LedgerEntry& mCurrent;
 
   public:
-    explicit Impl(AbstractLedgerState& ls,
-                                  LedgerEntry& current);
+    explicit Impl(AbstractLedgerState& ls, LedgerEntry& current);
 
     ~Impl() override;
 
@@ -56,7 +55,7 @@ LedgerStateEntry::LedgerStateEntry()
 }
 
 LedgerStateEntry::LedgerStateEntry(std::shared_ptr<Impl> const& impl)
-    : mImpl(impl)
+    : mImpl(impl) // Constructing weak_ptr from shared_ptr is noexcept
 {
 }
 
@@ -152,7 +151,6 @@ void
 LedgerStateEntry::Impl::erase()
 {
     auto key = LedgerEntryKey(mCurrent);
-    mLedgerState.deactivate(key);
     mLedgerState.erase(key);
 }
 
@@ -225,9 +223,8 @@ ConstLedgerStateEntry::ConstLedgerStateEntry()
 {
 }
 
-ConstLedgerStateEntry::ConstLedgerStateEntry(
-    std::shared_ptr<Impl> const& impl)
-    : mImpl(impl)
+ConstLedgerStateEntry::ConstLedgerStateEntry(std::shared_ptr<Impl> const& impl)
+    : mImpl(impl) // Constructing weak_ptr from shared_ptr is noexcept
 {
 }
 

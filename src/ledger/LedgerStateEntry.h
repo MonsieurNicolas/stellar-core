@@ -32,6 +32,7 @@ class LedgerStateEntry
     std::shared_ptr<Impl const> getImpl() const;
 
   public:
+    // LedgerStateEntry constructors do not throw
     LedgerStateEntry();
     explicit LedgerStateEntry(std::shared_ptr<Impl> const& impl);
 
@@ -72,6 +73,7 @@ class ConstLedgerStateEntry
     std::shared_ptr<Impl const> getImpl() const;
 
   public:
+    // ConstLedgerStateEntry constructors do not throw
     ConstLedgerStateEntry();
     explicit ConstLedgerStateEntry(std::shared_ptr<Impl> const& impl);
 

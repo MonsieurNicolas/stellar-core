@@ -24,6 +24,7 @@ class LedgerStateHeader
     std::shared_ptr<Impl const> getImpl() const;
 
   public:
+    // LedgerStateEntry constructors do not throw
     explicit LedgerStateHeader(std::shared_ptr<Impl> const& impl);
 
     ~LedgerStateHeader();
