@@ -1038,8 +1038,9 @@ LedgerManagerImpl::storeCurrentLedger(LedgerHeader const& header)
 void
 LedgerManagerImpl::ledgerClosed(AbstractLedgerState& ls)
 {
-    mApp.getBucketManager().addBatch(mApp, ls.loadHeader().current().ledgerSeq,
-                                     ls.getLiveEntries(), ls.getDeadEntries());
+    auto ledgerSeq = ls.loadHeader().current().ledgerSeq;
+    mApp.getBucketManager().addBatch(mApp, ledgerSeq, ls.getLiveEntries(),
+                                     ls.getDeadEntries());
 
     ls.unsealHeader([this] (LedgerHeader& lh) {
         mApp.getBucketManager().snapshotLedger(lh);

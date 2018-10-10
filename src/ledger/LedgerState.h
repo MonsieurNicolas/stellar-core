@@ -7,6 +7,7 @@
 #include "ledger/LedgerStateEntry.h"
 #include "ledger/LedgerStateHeader.h"
 #include "xdr/Stellar-ledger.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
