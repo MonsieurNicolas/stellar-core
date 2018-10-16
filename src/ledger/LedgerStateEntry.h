@@ -39,7 +39,7 @@ class LedgerStateEntry
 
     // Copy construction and copy assignment are forbidden.
     LedgerStateEntry(LedgerStateEntry const&) = delete;
-    LedgerStateEntry& operator=(LedgerStateEntry const&);
+    LedgerStateEntry& operator=(LedgerStateEntry const&) = delete;
 
     // Move construction and move assignment are permitted.
     LedgerStateEntry(LedgerStateEntry&& other);

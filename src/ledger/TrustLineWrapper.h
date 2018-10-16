@@ -25,15 +25,15 @@ class TrustLineWrapper
   public:
     TrustLineWrapper();
     TrustLineWrapper(AbstractLedgerState& ls, AccountID const& accountID, Asset const& asset);
-    TrustLineWrapper(LedgerStateEntry&& entry);
+    explicit TrustLineWrapper(LedgerStateEntry&& entry);
 
-    operator bool() const;
+    TrustLineWrapper(TrustLineWrapper const&) = delete;
+    TrustLineWrapper& operator=(TrustLineWrapper const&) = delete;
 
-    TrustLineWrapper(TrustLineWrapper const& other) = delete;
-    TrustLineWrapper& operator=(TrustLineWrapper const& other) = delete;
+    TrustLineWrapper(TrustLineWrapper&&) = default;
+    TrustLineWrapper& operator=(TrustLineWrapper&&) = default;
 
-    TrustLineWrapper(TrustLineWrapper&& other) = default;
-    TrustLineWrapper& operator=(TrustLineWrapper&& other) = default;
+    explicit operator bool() const;
 
     AccountID const& getAccountID() const;
     Asset const& getAsset() const;
@@ -61,6 +61,14 @@ class TrustLineWrapper
 class TrustLineWrapper::AbstractImpl
 {
   public:
+    AbstractImpl() = default;
+
+    AbstractImpl(AbstractImpl const&) = delete;
+    AbstractImpl& operator=(AbstractImpl const&) = delete;
+
+    AbstractImpl(AbstractImpl&&) = delete;
+    AbstractImpl& operator=(AbstractImpl&&) = delete;
+
     virtual ~AbstractImpl() {};
 
     virtual operator bool() const = 0;
@@ -158,15 +166,15 @@ class ConstTrustLineWrapper
   public:
     ConstTrustLineWrapper();
     ConstTrustLineWrapper(AbstractLedgerState& ls, AccountID const& accountID, Asset const& asset);
-    ConstTrustLineWrapper(ConstLedgerStateEntry&& entry);
+    explicit ConstTrustLineWrapper(ConstLedgerStateEntry&& entry);
 
-    operator bool() const;
+    ConstTrustLineWrapper(ConstTrustLineWrapper const&) = delete;
+    ConstTrustLineWrapper& operator=(ConstTrustLineWrapper const&) = delete;
 
-    ConstTrustLineWrapper(ConstTrustLineWrapper const& other) = delete;
-    ConstTrustLineWrapper& operator=(ConstTrustLineWrapper const& other) = delete;
+    ConstTrustLineWrapper(ConstTrustLineWrapper&&) = default;
+    ConstTrustLineWrapper& operator=(ConstTrustLineWrapper&&) = default;
 
-    ConstTrustLineWrapper(ConstTrustLineWrapper&& other) = default;
-    ConstTrustLineWrapper& operator=(ConstTrustLineWrapper&& other) = default;
+    explicit operator bool() const;
 
     int64_t getBalance() const;
 
@@ -182,6 +190,14 @@ class ConstTrustLineWrapper
 class ConstTrustLineWrapper::AbstractImpl
 {
   public:
+    AbstractImpl() = default;
+
+    AbstractImpl(AbstractImpl const&) = delete;
+    AbstractImpl& operator=(AbstractImpl const&) = delete;
+
+    AbstractImpl(AbstractImpl&&) = delete;
+    AbstractImpl& operator=(AbstractImpl&&) = delete;
+
     virtual ~AbstractImpl() {};
 
     virtual operator bool() const = 0;
