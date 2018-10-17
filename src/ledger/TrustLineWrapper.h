@@ -94,67 +94,6 @@ class TrustLineWrapper::AbstractImpl
     virtual int64_t getMaxAmountReceive(LedgerStateHeader const& header) const = 0;
 };
 
-class TrustLineWrapper::IssuerImpl : public TrustLineWrapper::AbstractImpl
-{
-    AccountID const mAccountID;
-    Asset const mAsset;
-
-  public:
-    IssuerImpl(AccountID const& accountID, Asset const& asset);
-
-    operator bool() const override;
-
-    AccountID const& getAccountID() const override;
-    Asset const& getAsset() const override;
-
-    int64_t getBalance() const override;
-    bool addBalance(LedgerStateHeader const& header, int64_t delta) override;
-
-    int64_t getBuyingLiabilities(LedgerStateHeader const& header) override;
-    int64_t getSellingLiabilities(LedgerStateHeader const& header) override;
-
-    int64_t addBuyingLiabilities(LedgerStateHeader const& header,
-                                 int64_t delta) override;
-    int64_t addSellingLiabilities(LedgerStateHeader const& header,
-                                  int64_t delta) override;
-
-    bool isAuthorized() const override;
-
-    int64_t getAvailableBalance(LedgerStateHeader const& header) const override;
-
-    int64_t getMaxAmountReceive(LedgerStateHeader const& header) const override;
-};
-
-class TrustLineWrapper::NonIssuerImpl : public TrustLineWrapper::AbstractImpl
-{
-    LedgerStateEntry mEntry;
-
-  public:
-    NonIssuerImpl(LedgerStateEntry&& entry);
-
-    operator bool() const override;
-
-    AccountID const& getAccountID() const override;
-    Asset const& getAsset() const override;
-
-    int64_t getBalance() const override;
-    bool addBalance(LedgerStateHeader const& header, int64_t delta) override;
-
-    int64_t getBuyingLiabilities(LedgerStateHeader const& header) override;
-    int64_t getSellingLiabilities(LedgerStateHeader const& header) override;
-
-    int64_t addBuyingLiabilities(LedgerStateHeader const& header,
-                                 int64_t delta) override;
-    int64_t addSellingLiabilities(LedgerStateHeader const& header,
-                                  int64_t delta) override;
-
-    bool isAuthorized() const override;
-
-    int64_t getAvailableBalance(LedgerStateHeader const& header) const override;
-
-    int64_t getMaxAmountReceive(LedgerStateHeader const& header) const override;
-};
-
 class ConstTrustLineWrapper
 {
     class AbstractImpl;
@@ -209,37 +148,5 @@ class ConstTrustLineWrapper::AbstractImpl
     virtual int64_t getAvailableBalance(LedgerStateHeader const& header) const = 0;
 
     virtual int64_t getMaxAmountReceive(LedgerStateHeader const& header) const = 0;
-};
-
-class ConstTrustLineWrapper::NonIssuerImpl : public ConstTrustLineWrapper::AbstractImpl
-{
-    ConstLedgerStateEntry mEntry;
-
-  public:
-    NonIssuerImpl(ConstLedgerStateEntry&& entry);
-
-    operator bool() const override;
-
-    int64_t getBalance() const override;
-
-    bool isAuthorized() const override;
-
-    int64_t getAvailableBalance(LedgerStateHeader const& header) const override;
-
-    int64_t getMaxAmountReceive(LedgerStateHeader const& header) const override;
-};
-
-class ConstTrustLineWrapper::IssuerImpl : public ConstTrustLineWrapper::AbstractImpl
-{
-  public:
-    operator bool() const override;
-
-    int64_t getBalance() const override;
-
-    bool isAuthorized() const override;
-
-    int64_t getAvailableBalance(LedgerStateHeader const& header) const override;
-
-    int64_t getMaxAmountReceive(LedgerStateHeader const& header) const override;
 };
 }
