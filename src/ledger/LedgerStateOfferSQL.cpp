@@ -281,8 +281,6 @@ std::list<LedgerEntry>::const_iterator
 LedgerStateRoot::Impl::loadOffers(StatementContext& prep,
                                   std::list<LedgerEntry>& offers) const
 {
-    auto iterNext = --offers.cend();
-
     std::string actIDStrKey;
     unsigned int sellingAssetType, buyingAssetType;
     std::string sellingAssetCode, buyingAssetCode, sellingIssuerStrKey,
@@ -310,6 +308,8 @@ LedgerStateRoot::Impl::loadOffers(StatementContext& prep,
     st.exchange(soci::into(le.lastModifiedLedgerSeq));
     st.define_and_bind();
     st.execute(true);
+
+    auto iterNext = offers.cend();
     while (st.got_data())
     {
         oe.sellerID = KeyUtils::fromStrKey<PublicKey>(actIDStrKey);
@@ -320,11 +320,18 @@ LedgerStateRoot::Impl::loadOffers(StatementContext& prep,
                      buyingIssuerIndicator, buyingAssetCode,
                      buyingAssetCodeIndicator);
 
-        offers.emplace_back(le);
+        if (iterNext == offers.cend())
+        {
+            iterNext = offers.emplace(iterNext, le);
+        }
+        else
+        {
+            offers.emplace_back(le);
+        }
         st.fetch();
     }
 
-    return ++iterNext;
+    return iterNext;
 }
 
 void
