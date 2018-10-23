@@ -989,11 +989,11 @@ LedgerManagerImpl::applyTransactions(std::vector<TransactionFramePtr>& txs,
         }
         catch (InvariantDoesNotHold& e)
         {
-            throw e;
+            throw;
         }
         catch (LedgerStateRootFatalError& e)
         {
-            throw e;
+            throw;
         }
         catch (std::runtime_error& e)
         {

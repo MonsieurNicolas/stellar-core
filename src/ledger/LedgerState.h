@@ -268,7 +268,7 @@ class AbstractLedgerState : public AbstractLedgerStateParent
     virtual void unsealHeader(std::function<void(LedgerHeader&)> f) = 0;
 };
 
-class LedgerState : public AbstractLedgerState
+class LedgerState final : public AbstractLedgerState
 {
     class Impl;
     std::unique_ptr<Impl> mImpl;
