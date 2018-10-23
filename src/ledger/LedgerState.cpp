@@ -287,7 +287,6 @@ LedgerState::Impl::create(LedgerState& self, LedgerEntry const& entry)
     mActive.emplace(key, toEntryImplBase(impl));
     LedgerStateEntry lse(impl);
 
-    // TODO(jonjove): Is std::map::operator[] exception safe?
     // std::shared_ptr assignment is noexcept
     mEntry[key] = current;
     return lse;
@@ -349,8 +348,7 @@ LedgerState::Impl::erase(LedgerKey const& key)
 
     if (!mParent.getNewestVersion(key))
     { // Created in this LedgerState
-        auto iter = mEntry.find(key);
-        mEntry.erase(iter);
+        mEntry.erase(key);
     }
     else
     { // Existed in a previous LedgerState
@@ -828,7 +826,6 @@ LedgerState::Impl::load(LedgerState& self, LedgerKey const& key)
     mActive.emplace(key, toEntryImplBase(impl));
     LedgerStateEntry lse(impl);
 
-    // TODO(jonjove): Is std::map::operator[] exception safe?
     // std::shared_ptr assignment is noexcept
     mEntry[key] = current;
     return lse;
