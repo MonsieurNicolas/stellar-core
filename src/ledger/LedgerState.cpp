@@ -222,7 +222,6 @@ LedgerState::Impl::commitChild(EntryIterator iter)
     // guarantee, so use std::unique_ptr<...>::swap to achieve it
     auto childHeader = std::make_unique<LedgerHeader>(mChild->getHeader());
 
-    auto previousEntries = mEntry;
     try
     {
         for (; (bool)iter; ++iter)
@@ -244,8 +243,7 @@ LedgerState::Impl::commitChild(EntryIterator iter)
     }
     catch (...)
     {
-        mEntry.swap(previousEntries);
-        throw;
+        abort();
     }
 
     // std::unique_ptr<...>::swap does not throw
