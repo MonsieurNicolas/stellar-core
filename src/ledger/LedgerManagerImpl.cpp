@@ -991,10 +991,6 @@ LedgerManagerImpl::applyTransactions(std::vector<TransactionFramePtr>& txs,
         {
             throw;
         }
-        catch (LedgerStateRootFatalError& e)
-        {
-            throw;
-        }
         catch (std::runtime_error& e)
         {
             CLOG(ERROR, "Ledger") << "Exception during tx->apply: " << e.what();

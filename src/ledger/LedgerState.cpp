@@ -45,12 +45,6 @@ isBetterOffer(LedgerEntry const& lhsEntry, LedgerEntry const& rhsEntry)
     }
 }
 
-// Implementation of LedgerStateRootFatalError --------------------------------
-LedgerStateRootFatalError::LedgerStateRootFatalError(std::string const& msg)
-    : std::runtime_error(msg)
-{
-}
-
 // Implementation of AbstractLedgerStateParent --------------------------------
 AbstractLedgerStateParent::~AbstractLedgerStateParent()
 {
@@ -1217,7 +1211,7 @@ LedgerStateRoot::Impl::commitChild(EntryIterator iter)
     }
     catch (...)
     {
-        throw LedgerStateRootFatalError("LedgerStateRoot could not commit to database");
+        abort();
     }
 
     // Clearing the cache does not throw
@@ -1364,7 +1358,7 @@ LedgerStateRoot::Impl::getAllOffers()
     }
     catch (...)
     {
-        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+        abort();
     }
 
     std::map<LedgerKey, LedgerEntry> offersByKey;
@@ -1423,7 +1417,7 @@ LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
         }
         catch (...)
         {
-            throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+            abort();
         }
 
         if (std::distance(newOfferIter, offers.cend()) < BATCH_SIZE)
@@ -1453,7 +1447,7 @@ LedgerStateRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
     }
     catch (...)
     {
-        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+        abort();
     }
 
     std::map<LedgerKey, LedgerEntry> res;
@@ -1491,7 +1485,7 @@ LedgerStateRoot::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     }
     catch (...)
     {
-        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+        abort();
     }
 }
 
@@ -1533,7 +1527,7 @@ LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
     }
     catch (...)
     {
-        throw LedgerStateRootFatalError("LedgerStateRoot could not load from database");
+        abort();
     }
 
     putInEntryCache(cacheKey, entry);
@@ -1556,7 +1550,7 @@ LedgerStateRoot::Impl::rollbackChild()
     }
     catch (...)
     {
-        throw LedgerStateRootFatalError("LedgerStateRoot could not rollback");
+        abort();
     }
 
     mChild = nullptr;

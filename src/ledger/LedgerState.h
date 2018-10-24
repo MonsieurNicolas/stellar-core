@@ -51,12 +51,6 @@ struct LedgerStateDelta
     HeaderDelta header;
 };
 
-class LedgerStateRootFatalError : public std::runtime_error
-{
-  public:
-    explicit LedgerStateRootFatalError(std::string const& msg);
-};
-
 // An abstraction for an object that is iterator-like and permits enumerating
 // the LedgerStateEntry objects managed by an AbstractLedgerState. This enables
 // an AbstractLedgerStateParent to iterate over the entries managed by its child

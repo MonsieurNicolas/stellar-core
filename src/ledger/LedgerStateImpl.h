@@ -44,11 +44,10 @@ class LedgerState::Impl
     void checkNotSealed() const;
 
     // getDeltaVotes has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::map<AccountID, int64_t> getDeltaVotes() const;
 
     // getTotalVotes has the strong exception safety guarantee
@@ -81,20 +80,17 @@ class LedgerState::Impl
     // addChild has the strong exception safety guarantee
     void addChild(AbstractLedgerState& child);
 
-    // commit has the strong exception safety guarantee. If
-    // LedgerStateRootFatal error is thrown, there are no guarantees.
+    // commit has the strong exception safety guarantee.
     void commit(Identifier id);
 
-    // commitChild has the strong exception safety guarantee. If
-    // LedgerStateRootFatal error is thrown, there are no guarantees.
+    // commitChild has the strong exception safety guarantee.
     void commitChild(EntryIterator iter);
 
     // create has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     LedgerStateEntry create(LedgerState& self, LedgerEntry const& entry);
 
     // deactivate has the strong exception safety guarantee
@@ -103,58 +99,52 @@ class LedgerState::Impl
     // deactivateHeader has the strong exception safety guarantee
     void deactivateHeader();
 
-    // erase has the basic exception safety guarantee. If it throws an exception
-    // other than LedgerStateRootFatalError, then
+    // erase has the basic exception safety guarantee. If it throws an
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     void erase(LedgerKey const& key);
 
     // getAllOffers has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::map<LedgerKey, LedgerEntry> getAllOffers();
 
     // getBestOffer has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, modified or even
     //   cleared
     // - the best offers cache may be, but is not guaranteed to be, modified or
     //   even cleared
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  std::set<LedgerKey>&& exclude);
 
     // getChanges has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     LedgerEntryChanges getChanges();
 
     // getDeadEntries has the strong exception safety guarantee
     std::vector<LedgerKey> getDeadEntries();
 
     // getDelta has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     LedgerStateDelta getDelta();
 
     // getOffersByAccountAndAsset has the basic exception safety guarantee. If
-    // it throws an exception other than LedgerStateRootFatalError, then
+    // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset);
 
@@ -162,10 +152,9 @@ class LedgerState::Impl
     LedgerHeader const& getHeader() const;
 
     // getInflationWinners has the basic exception safety guarantee. If it
-    // throws an exception other than LedgerStateRootFatalError, then
+    // throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::vector<InflationWinner>
     getInflationWinners(size_t maxWinners, int64_t minBalance);
 
@@ -173,40 +162,36 @@ class LedgerState::Impl
     std::vector<LedgerEntry> getLiveEntries();
 
     // getNewestVersion has the basic exception safety guarantee. If it throws
-    // an exception other than LedgerStateRootFatalError, then
+    // an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::shared_ptr<LedgerEntry const>
     getNewestVersion(LedgerKey const& key) const;
 
-    // load has the basic exception safety guarantee. If it throws an exception
-    // other than LedgerStateRootFatalError, then
+    // load has the basic exception safety guarantee. If it throws an exception,
+    // then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     LedgerStateEntry load(LedgerState& self, LedgerKey const& key);
 
     // loadAllOffers has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::map<AccountID, std::vector<LedgerStateEntry>>
     loadAllOffers(LedgerState& self);
 
     // loadBestOffer has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, modified or even
     //   cleared
     // - the best offers cache may be, but is not guaranteed to be, modified or
     //   even cleared
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     LedgerStateEntry loadBestOffer(LedgerState& self, Asset const& buying,
                                    Asset const& selling);
 
@@ -214,21 +199,19 @@ class LedgerState::Impl
     LedgerStateHeader loadHeader(LedgerState& self);
 
     // loadOffersByAccountAndAsset has the basic exception safety guarantee. If
-    // it throws an exception other than LedgerStateRootFatalError, then
+    // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::vector<LedgerStateEntry>
     loadOffersByAccountAndAsset(LedgerState& self, AccountID const& accountID,
                                 Asset const& asset);
 
     // loadWithoutRecord has the basic exception safety guarantee. If it throws
-    // an exception other than LedgerStateRootFatalError, then
+    // an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     ConstLedgerStateEntry loadWithoutRecord(LedgerState& self,
                                             LedgerKey const& key);
 
@@ -347,8 +330,7 @@ class LedgerStateRoot::Impl
     // addChild has the strong exception safety guarantee.
     void addChild(AbstractLedgerState& child);
 
-    // commitChild has the strong exception safety guarantee. If it throws
-    // LedgerStateRootFatalError, there are no guarantees.
+    // commitChild has the strong exception safety guarantee.
     void commitChild(EntryIterator iter);
 
     // countObjects has the strong exception safety guarantee.
@@ -366,30 +348,27 @@ class LedgerStateRoot::Impl
     void dropTrustLines();
 
     // getAllOffers has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::map<LedgerKey, LedgerEntry> getAllOffers();
 
     // getBestOffer has the basic exception safety guarantee. If it throws an
-    // exception other than LedgerStateRootFatalError, then
+    // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, modified or even
     //   cleared
     // - the best offers cache may be, but is not guaranteed to be, modified or
     //   even cleared
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  std::set<LedgerKey>&& exclude);
 
     // getOffersByAccountAndAsset has the basic exception safety guarantee. If
-    // it throws an exception other than LedgerStateRootFatalError, then
+    // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset);
 
@@ -397,24 +376,21 @@ class LedgerStateRoot::Impl
     LedgerHeader const& getHeader() const;
 
     // getInflationWinners has the basic exception safety guarantee. If it
-    // throws an exception other than LedgerStateRootFatalError, then
+    // throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::vector<InflationWinner>
     getInflationWinners(size_t maxWinners, int64_t minBalance);
 
     // getNewestVersion has the basic exception safety guarantee. If it throws
-    // an exception other than LedgerStateRootFatalError, then
+    // an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    // If it throws LedgerStateRootFatalError, there are no guarantees.
     std::shared_ptr<LedgerEntry const>
     getNewestVersion(LedgerKey const& key) const;
 
-    // rollbackChild has the strong exception safety guarantee. If it throws
-    // LedgerStateRootFatalError, there are no guarantees.
+    // rollbackChild has the strong exception safety guarantee.
     void rollbackChild();
 };
 }
