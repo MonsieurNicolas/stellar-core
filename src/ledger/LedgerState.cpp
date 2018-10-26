@@ -20,31 +20,6 @@
 namespace stellar
 {
 
-bool
-isBetterOffer(LedgerEntry const& lhsEntry, LedgerEntry const& rhsEntry)
-{
-    auto const& lhs = lhsEntry.data.offer();
-    auto const& rhs = rhsEntry.data.offer();
-
-    assert(lhs.buying == rhs.buying);
-    assert(lhs.selling == rhs.selling);
-
-    double lhsPrice = double(lhs.price.n) / double(lhs.price.d);
-    double rhsPrice = double(rhs.price.n) / double(rhs.price.d);
-    if (lhsPrice < rhsPrice)
-    {
-        return true;
-    }
-    else if (lhsPrice == rhsPrice)
-    {
-        return lhs.offerID < rhs.offerID;
-    }
-    else
-    {
-        return false;
-    }
-}
-
 // Implementation of AbstractLedgerStateParent --------------------------------
 AbstractLedgerStateParent::~AbstractLedgerStateParent()
 {

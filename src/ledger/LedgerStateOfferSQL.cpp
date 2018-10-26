@@ -178,6 +178,34 @@ LedgerStateRoot::Impl::loadBestOffers(std::list<LedgerEntry>& offers,
     }
 }
 
+// Note: The order induced by this function must match the order used in the
+// SQL query for loadBestOffers above.
+bool
+isBetterOffer(LedgerEntry const& lhsEntry, LedgerEntry const& rhsEntry)
+{
+    auto const& lhs = lhsEntry.data.offer();
+    auto const& rhs = rhsEntry.data.offer();
+
+    assert(lhs.buying == rhs.buying);
+    assert(lhs.selling == rhs.selling);
+
+    double lhsPrice = double(lhs.price.n) / double(lhs.price.d);
+    double rhsPrice = double(rhs.price.n) / double(rhs.price.d);
+    if (lhsPrice < rhsPrice)
+    {
+        return true;
+    }
+    else if (lhsPrice == rhsPrice)
+    {
+        return lhs.offerID < rhs.offerID;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
 // Note: This function is currently only used in AllowTrustOpFrame, which means
 // the asset parameter will never satisfy asset.type() == ASSET_TYPE_NATIVE. As
 // a consequence, I have not implemented that possibility so this function
