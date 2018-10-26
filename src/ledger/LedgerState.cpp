@@ -1364,6 +1364,11 @@ std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
                                     std::set<LedgerKey>& exclude)
 {
+    // Note: Elements of mBestOffersCache are properly sorted lists of the best
+    // offers for a certain asset pair. This function maintaints the invariant
+    // that the lists of best offers remain properly sorted. The sort order is
+    // that determined by loadBestOffers and isBetterOffer (both induce the same
+    // order).
     auto cacheKey = getBestOffersCacheKey(buying, selling);
     if (!mBestOffersCache->exists(cacheKey))
     {
