@@ -351,13 +351,13 @@ LedgerState::Impl::getAllOffers()
     {
         auto const& key = kv.first;
         auto const& entry = kv.second;
+        if (key.type() != OFFER)
+        {
+            continue;
+        }
         if (!entry)
         {
             offers.erase(key);
-            continue;
-        }
-        if (entry->data.type() != OFFER)
-        {
             continue;
         }
         offers[key] = *entry;
