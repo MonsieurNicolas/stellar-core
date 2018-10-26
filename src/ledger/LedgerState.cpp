@@ -367,14 +367,14 @@ LedgerState::Impl::getAllOffers()
 
 std::shared_ptr<LedgerEntry const>
 LedgerState::getBestOffer(Asset const& buying, Asset const& selling,
-                          std::set<LedgerKey>&& exclude)
+                          std::set<LedgerKey>& exclude)
 {
-    return getImpl()->getBestOffer(buying, selling, std::move(exclude));
+    return getImpl()->getBestOffer(buying, selling, exclude);
 }
 
 std::shared_ptr<LedgerEntry const>
 LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
-                                std::set<LedgerKey>&& exclude)
+                                std::set<LedgerKey>& exclude)
 {
     auto end = mEntry.cend();
     auto bestOfferIter = end;
@@ -411,7 +411,7 @@ LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
         bestOffer = std::make_shared<LedgerEntry const>(*bestOfferIter->second);
     }
 
-    auto parentBestOffer = mParent.getBestOffer(buying, selling, std::move(exclude));
+    auto parentBestOffer = mParent.getBestOffer(buying, selling, exclude);
     if (bestOffer && parentBestOffer)
     {
         return isBetterOffer(*bestOffer, *parentBestOffer)
@@ -840,7 +840,8 @@ LedgerState::Impl::loadBestOffer(LedgerState& self, Asset const& buying,
     throwIfSealed();
     throwIfChild();
 
-    auto le = getBestOffer(buying, selling, {});
+    std::set<LedgerKey> exclude;
+    auto le = getBestOffer(buying, selling, exclude);
     return le ? load(self, LedgerEntryKey(*le)) : LedgerStateEntry();
 }
 
@@ -1338,9 +1339,9 @@ LedgerStateRoot::Impl::getAllOffers()
 
 std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::getBestOffer(Asset const& buying, Asset const& selling,
-                              std::set<LedgerKey>&& exclude)
+                              std::set<LedgerKey>& exclude)
 {
-    return mImpl->getBestOffer(buying, selling, std::move(exclude));
+    return mImpl->getBestOffer(buying, selling, exclude);
 }
 
 static std::shared_ptr<LedgerEntry const>
@@ -1361,7 +1362,7 @@ findIncludedOffer(std::list<LedgerEntry>::const_iterator iter,
 
 std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
-                                    std::set<LedgerKey>&& exclude)
+                                    std::set<LedgerKey>& exclude)
 {
     auto cacheKey = getBestOffersCacheKey(buying, selling);
     if (!mBestOffersCache->exists(cacheKey))

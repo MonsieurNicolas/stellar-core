@@ -118,7 +118,7 @@ class AbstractLedgerStateParent
     virtual std::map<LedgerKey, LedgerEntry> getAllOffers() = 0;
     virtual std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>&& exclude) = 0;
+                 std::set<LedgerKey>& exclude) = 0;
     virtual std::map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset) = 0;
 
@@ -285,7 +285,7 @@ class LedgerState final : public AbstractLedgerState
 
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>&& exclude) override;
+                 std::set<LedgerKey>& exclude) override;
 
     LedgerEntryChanges getChanges() override;
 
@@ -358,7 +358,7 @@ class LedgerStateRoot : public AbstractLedgerStateParent
 
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>&& exclude) override;
+                 std::set<LedgerKey>& exclude) override;
 
     std::map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset) override;
