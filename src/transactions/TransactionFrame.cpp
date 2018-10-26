@@ -112,7 +112,8 @@ TransactionFrame::getFee() const
 int64_t
 TransactionFrame::getMinFee(LedgerStateHeader const& header) const
 {
-    return header.current().baseFee * std::max(size_t(1), mOperations.size());
+    return ((int64_t)header.current().baseFee) *
+        std::max<int64_t>(1, mOperations.size());
 }
 
 void
