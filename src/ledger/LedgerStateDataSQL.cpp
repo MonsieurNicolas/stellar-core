@@ -114,7 +114,7 @@ LedgerStateRoot::Impl::deleteData(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropData()
 {
-    checkNoChild();
+    throwIfChild();
     mEntryCache->clear();
     mBestOffersCache->clear();
 

@@ -370,7 +370,7 @@ LedgerStateRoot::Impl::deleteAccount(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropAccounts()
 {
-    checkNoChild();
+    throwIfChild();
     mEntryCache->clear();
     mBestOffersCache->clear();
 

@@ -161,8 +161,8 @@ LedgerState::addChild(AbstractLedgerState& child)
 void
 LedgerState::Impl::addChild(AbstractLedgerState& child)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     mChild = &child;
 
@@ -174,7 +174,7 @@ LedgerState::Impl::addChild(AbstractLedgerState& child)
 }
 
 void
-LedgerState::Impl::checkNoChild() const
+LedgerState::Impl::throwIfChild() const
 {
     if (mChild)
     {
@@ -183,7 +183,7 @@ LedgerState::Impl::checkNoChild() const
 }
 
 void
-LedgerState::Impl::checkNotSealed() const
+LedgerState::Impl::throwIfSealed() const
 {
     if (mIsSealed)
     {
@@ -260,8 +260,8 @@ LedgerState::create(LedgerEntry const& entry)
 LedgerStateEntry
 LedgerState::Impl::create(LedgerState& self, LedgerEntry const& entry)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     auto key = LedgerEntryKey(entry);
     if (getNewestVersion(key))
@@ -326,8 +326,8 @@ LedgerState::erase(LedgerKey const& key)
 void
 LedgerState::Impl::erase(LedgerKey const& key)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     auto newest = getNewestVersion(key);
     if (!newest)
@@ -795,8 +795,8 @@ LedgerState::load(LedgerKey const& key)
 LedgerStateEntry
 LedgerState::Impl::load(LedgerState& self, LedgerKey const& key)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
     if (mActive.find(key) != mActive.end())
     {
         throw std::runtime_error("Key is active");
@@ -832,8 +832,8 @@ LedgerState::loadAllOffers()
 std::map<AccountID, std::vector<LedgerStateEntry>>
 LedgerState::Impl::loadAllOffers(LedgerState& self)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     auto previousEntries = mEntry;
     auto offers = getAllOffers();
@@ -868,8 +868,8 @@ LedgerStateEntry
 LedgerState::Impl::loadBestOffer(LedgerState& self, Asset const& buying,
                                  Asset const& selling)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     auto le = getBestOffer(buying, selling, {});
     return le ? load(self, LedgerEntryKey(*le)) : LedgerStateEntry();
@@ -884,8 +884,8 @@ LedgerState::loadHeader()
 LedgerStateHeader
 LedgerState::Impl::loadHeader(LedgerState& self)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
     if (mActiveHeader)
     {
         throw std::runtime_error("LedgerStateHeader is active");
@@ -911,8 +911,8 @@ LedgerState::Impl::loadOffersByAccountAndAsset(LedgerState& self,
                                                AccountID const& accountID,
                                                Asset const& asset)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     auto previousEntries = mEntry;
     auto offers = getOffersByAccountAndAsset(accountID, asset);
@@ -945,8 +945,8 @@ LedgerState::loadWithoutRecord(LedgerKey const& key)
 ConstLedgerStateEntry
 LedgerState::Impl::loadWithoutRecord(LedgerState& self, LedgerKey const& key)
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
     if (mActive.find(key) != mActive.end())
     {
         throw std::runtime_error("Key is active");
@@ -1028,8 +1028,8 @@ LedgerState::Impl::unsealHeader(
 LedgerState::Impl::EntryMap
 LedgerState::Impl::maybeUpdateLastModified() const
 {
-    checkNotSealed();
-    checkNoChild();
+    throwIfSealed();
+    throwIfChild();
 
     auto entries = mEntry;
     if (mShouldUpdateLastModified)
@@ -1052,7 +1052,7 @@ LedgerState::Impl::maybeUpdateLastModifiedThenInvokeThenSeal(
 {
     if (!mIsSealed)
     {
-        // Invokes checkNoChild and checkNotSealed
+        // Invokes throwIfChild and throwIfSealed
         auto entries = maybeUpdateLastModified();
 
         f(entries);
@@ -1159,7 +1159,7 @@ LedgerStateRoot::Impl::addChild(AbstractLedgerState& child)
 }
 
 void
-LedgerStateRoot::Impl::checkNoChild() const
+LedgerStateRoot::Impl::throwIfChild() const
 {
     if (mChild)
     {
@@ -1252,7 +1252,7 @@ uint64_t
 LedgerStateRoot::Impl::countObjects(LedgerEntryType let) const
 {
     using namespace soci;
-    checkNoChild();
+    throwIfChild();
 
     std::string query =
         "SELECT COUNT(*) FROM " + tableFromLedgerEntryType(let) + ";";
@@ -1273,7 +1273,7 @@ LedgerStateRoot::Impl::countObjects(LedgerEntryType let,
                                     LedgerRange const& ledgers) const
 {
     using namespace soci;
-    checkNoChild();
+    throwIfChild();
 
     std::string query =
         "SELECT COUNT(*) FROM " + tableFromLedgerEntryType(let) +
@@ -1296,7 +1296,7 @@ LedgerStateRoot::Impl::deleteObjectsModifiedOnOrAfterLedger(
         uint32_t ledger) const
 {
     using namespace soci;
-    checkNoChild();
+    throwIfChild();
     mEntryCache->clear();
     mBestOffersCache->clear();
 

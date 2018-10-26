@@ -40,8 +40,8 @@ class LedgerState::Impl
     bool const mShouldUpdateLastModified;
     bool mIsSealed;
 
-    void checkNoChild() const;
-    void checkNotSealed() const;
+    void throwIfChild() const;
+    void throwIfSealed() const;
 
     // getDeltaVotes has the basic exception safety guarantee. If it throws an
     // exception, then
@@ -269,7 +269,7 @@ class LedgerStateRoot::Impl
     std::unique_ptr<soci::transaction> mTransaction;
     AbstractLedgerState* mChild;
 
-    void checkNoChild() const;
+    void throwIfChild() const;
 
     std::shared_ptr<LedgerEntry const> loadAccount(LedgerKey const& key) const;
     std::shared_ptr<LedgerEntry const> loadData(LedgerKey const& key) const;

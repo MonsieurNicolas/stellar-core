@@ -201,7 +201,7 @@ LedgerStateRoot::Impl::deleteTrustLine(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropTrustLines()
 {
-    checkNoChild();
+    throwIfChild();
     mEntryCache->clear();
     mBestOffersCache->clear();
 

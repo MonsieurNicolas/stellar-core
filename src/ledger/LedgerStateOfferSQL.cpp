@@ -450,7 +450,7 @@ LedgerStateRoot::Impl::deleteOffer(LedgerKey const& key)
 void
 LedgerStateRoot::Impl::dropOffers()
 {
-    checkNoChild();
+    throwIfChild();
     mEntryCache->clear();
     mBestOffersCache->clear();
 
