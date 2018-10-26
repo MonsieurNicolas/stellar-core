@@ -261,10 +261,6 @@ void
 TxSetFrame::trimInvalid(Application& app,
                         std::vector<TransactionFramePtr>& trimmed)
 {
-    // Establish read-only transaction for duration of trimInvalid
-    soci::transaction sqltx(app.getDatabase().getSession());
-    app.getDatabase().setCurrentTransactionReadOnly();
-
     sortForHash();
 
     auto processInvalidTxLambda = [&](TransactionFramePtr tx,

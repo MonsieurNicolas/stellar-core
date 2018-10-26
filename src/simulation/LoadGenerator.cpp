@@ -191,8 +191,6 @@ LoadGenerator::generateLoad(bool isCreate, uint32_t nAccounts, uint32_t offset,
                             uint32_t nTxs, uint32_t txRate, uint32_t batchSize,
                             bool autoRate)
 {
-    soci::transaction sqltx(mApp.getDatabase().getSession());
-    mApp.getDatabase().setCurrentTransactionReadOnly();
     createRootAccount();
 
     // Finish if no more txs need to be created.
