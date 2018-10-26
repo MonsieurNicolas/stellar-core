@@ -81,7 +81,7 @@ class LedgerState::Impl
     void addChild(AbstractLedgerState& child);
 
     // commit has the strong exception safety guarantee.
-    void commit(Identifier id);
+    void commit();
 
     // commitChild has the strong exception safety guarantee.
     void commitChild(EntryIterator iter);
@@ -216,7 +216,7 @@ class LedgerState::Impl
                                             LedgerKey const& key);
 
     // rollback does not throw
-    void rollback(Identifier id);
+    void rollback();
 
     // rollbackChild does not throw
     void rollbackChild();

@@ -93,12 +93,6 @@ class EntryIterator
 class AbstractLedgerStateParent
 {
   public:
-    class Identifier
-    {
-        friend class AbstractLedgerStateParent;
-        Identifier(){};
-    };
-
     virtual ~AbstractLedgerStateParent();
 
     // addChild is called by a newly constructed AbstractLedgerState to become a
@@ -109,8 +103,8 @@ class AbstractLedgerStateParent
     // commitChild and rollbackChild are called by a child AbstractLedgerState
     // to trigger an atomic commit or an atomic rollback of the data stored in
     // the child.
-    virtual void commitChild(Identifier id, EntryIterator iter) = 0;
-    virtual void rollbackChild(Identifier id) = 0;
+    virtual void commitChild(EntryIterator iter) = 0;
+    virtual void rollbackChild() = 0;
 
     // getAllOffers, getBestOffer, and getOffersByAccountAndAsset are used to
     // handle some specific queries related to Offers.
@@ -145,9 +139,6 @@ class AbstractLedgerStateParent
     // or if the corresponding LedgerEntry has been erased.
     virtual std::shared_ptr<LedgerEntry const>
     getNewestVersion(LedgerKey const& key) const = 0;
-
-  protected:
-    Identifier getIdentifier() const;
 };
 
 // An abstraction for an object that is an AbstractLedgerStateParent and has
@@ -284,7 +275,7 @@ class LedgerState final : public AbstractLedgerState
 
     void commit() override;
 
-    void commitChild(Identifier id, EntryIterator iter) override;
+    void commitChild(EntryIterator iter) override;
 
     LedgerStateEntry create(LedgerEntry const& entry) override;
 
@@ -333,7 +324,7 @@ class LedgerState final : public AbstractLedgerState
 
     void rollback() override;
 
-    void rollbackChild(Identifier id) override;
+    void rollbackChild() override;
 
     void unsealHeader(std::function<void(LedgerHeader&)> f) override;
 };
@@ -351,7 +342,7 @@ class LedgerStateRoot : public AbstractLedgerStateParent
 
     void addChild(AbstractLedgerState& child) override;
 
-    void commitChild(Identifier id, EntryIterator iter) override;
+    void commitChild(EntryIterator iter) override;
 
     uint64_t countObjects(LedgerEntryType let) const;
     uint64_t countObjects(LedgerEntryType let, LedgerRange const& ledgers) const;
@@ -380,6 +371,6 @@ class LedgerStateRoot : public AbstractLedgerStateParent
     std::shared_ptr<LedgerEntry const>
     getNewestVersion(LedgerKey const& key) const override;
 
-    void rollbackChild(Identifier id) override;
+    void rollbackChild() override;
 };
 }

@@ -50,12 +50,6 @@ AbstractLedgerStateParent::~AbstractLedgerStateParent()
 {
 }
 
-AbstractLedgerStateParent::Identifier
-AbstractLedgerStateParent::getIdentifier() const
-{
-    return Identifier();
-}
-
 // Implementation of EntryIterator --------------------------------------------
 EntryIterator::EntryIterator(std::unique_ptr<AbstractImpl>&& impl)
     : mImpl(std::move(impl))
@@ -194,23 +188,23 @@ LedgerState::Impl::throwIfSealed() const
 void
 LedgerState::commit()
 {
-    getImpl()->commit(getIdentifier());
+    getImpl()->commit();
     mImpl.reset();
 }
 
 void
-LedgerState::Impl::commit(Identifier id)
+LedgerState::Impl::commit()
 {
     maybeUpdateLastModifiedThenInvokeThenSeal(
         [&] (EntryMap const& entries) {
             // getEntryIterator has the strong exception safety guarantee
             // commitChild has the strong exception safety guarantee
-            mParent.commitChild(id, getEntryIterator(entries));
+            mParent.commitChild(getEntryIterator(entries));
         });
 }
 
 void
-LedgerState::commitChild(Identifier id, EntryIterator iter)
+LedgerState::commitChild(EntryIterator iter)
 {
     getImpl()->commitChild(std::move(iter));
 }
@@ -971,12 +965,12 @@ LedgerState::Impl::loadWithoutRecord(LedgerState& self, LedgerKey const& key)
 void
 LedgerState::rollback()
 {
-    getImpl()->rollback(getIdentifier());
+    getImpl()->rollback();
     mImpl.reset();
 }
 
 void
-LedgerState::Impl::rollback(Identifier id)
+LedgerState::Impl::rollback()
 {
     if (mChild)
     {
@@ -986,11 +980,11 @@ LedgerState::Impl::rollback(Identifier id)
     mActive.clear();
     mActiveHeader.reset();
 
-    mParent.rollbackChild(id);
+    mParent.rollbackChild();
 }
 
 void
-LedgerState::rollbackChild(Identifier id)
+LedgerState::rollbackChild()
 {
     getImpl()->rollbackChild();
 }
@@ -1168,7 +1162,7 @@ LedgerStateRoot::Impl::throwIfChild() const
 }
 
 void
-LedgerStateRoot::commitChild(Identifier id, EntryIterator iter)
+LedgerStateRoot::commitChild(EntryIterator iter)
 {
     mImpl->commitChild(std::move(iter));
 }
@@ -1533,7 +1527,7 @@ LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
 }
 
 void
-LedgerStateRoot::rollbackChild(Identifier id)
+LedgerStateRoot::rollbackChild()
 {
     mImpl->rollbackChild();
 }
