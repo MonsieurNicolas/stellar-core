@@ -187,6 +187,7 @@ bool
 OperationFrame::checkValid(SignatureChecker& signatureChecker, Application& app,
                            AbstractLedgerState& lsOuter, bool forApply)
 {
+    // Note: ls is always rolled back so checkValid never modifies the ledger
     LedgerState ls(lsOuter);
     auto ledgerVersion = ls.loadHeader().current().ledgerVersion;
     if (!isVersionSupported(ledgerVersion))
