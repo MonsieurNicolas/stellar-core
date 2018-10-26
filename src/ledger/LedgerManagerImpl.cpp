@@ -925,7 +925,7 @@ LedgerManagerImpl::advanceLedgerPointers(LedgerHeader const& header)
     auto ledgerHash = sha256(xdr::xdr_to_opaque(header));
     CLOG(DEBUG, "Ledger") << "Advancing LCL: "
                           << ledgerAbbrev(mLastClosedLedger) << " -> "
-                          << ledgerAbbrev(header);
+                          << ledgerAbbrev(header, ledgerHash);
 
     mLastClosedLedger.hash = ledgerHash;
     mLastClosedLedger.header = header;
