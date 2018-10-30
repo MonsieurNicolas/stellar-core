@@ -950,23 +950,15 @@ crossOfferV10(AbstractLedgerState& ls, LedgerStateEntry& sellingWheatOffer,
             "invalid database state: offer must have matching account");
     }
 
-    TrustLineWrapper wheatLineAccountB;
-    if (wheat.type() != ASSET_TYPE_NATIVE)
-    {
-        wheatLineAccountB = stellar::loadTrustLine(ls, accountBID, wheat);
-    }
-
-    TrustLineWrapper sheepLineAccountB;
-    if (sheep.type() != ASSET_TYPE_NATIVE)
-    {
-        sheepLineAccountB = stellar::loadTrustLine(ls, accountBID, sheep);
-    }
-
     // Remove liabilities associated with the offer being crossed.
     LedgerStateEntry accountB;
+    TrustLineWrapper sheepLineAccountB;
+    TrustLineWrapper wheatLineAccountB;
     releaseLiabilities(ls, header, sellingWheatOffer, accountB,
                        sheepLineAccountB, wheatLineAccountB);
     // accountB is loaded at this point if either asset is native
+    // sheepLineAccountB is loaded if sheep is not native
+    // wheatLineAccountB is loaded if wheat is not native
 
     // As of the protocol version 10, this call to adjustOffer should have no
     // effect. We leave it here only as a preventative measure.
@@ -1037,25 +1029,25 @@ crossOfferV10(AbstractLedgerState& ls, LedgerStateEntry& sellingWheatOffer,
 
     auto res = (offer.amount == 0) ? CrossOfferResult::eOfferTaken
                                    : CrossOfferResult::eOfferPartial;
-    if (offer.amount == 0)
     {
-        sellingWheatOffer.erase();
-
-        // accountB could already be loaded if either asset is native
-        if (!accountB)
+        LedgerState lsInner(ls);
+        header = lsInner.loadHeader();
+        sellingWheatOffer = loadOffer(lsInner, accountBID, offerID);
+        if (res == CrossOfferResult::eOfferTaken)
         {
-            accountB = stellar::loadAccount(ls, accountBID);
+            sellingWheatOffer.erase();
+            accountB = stellar::loadAccount(lsInner, accountBID);
+            addNumEntries(header, accountB, -1);
         }
-        addNumEntries(header, accountB, -1);
-    }
-    else
-    {
-        acquireLiabilities(ls, header, sellingWheatOffer, accountB,
-                           sheepLineAccountB, wheatLineAccountB);
+        else
+        {
+            acquireLiabilities(lsInner, header, sellingWheatOffer);
+        }
+        lsInner.commit();
     }
 
     // Note: Cannot use sellingWheatOffer or offer (which is a reference) since
-    // it may have been erased at this point.
+    // it is not active (and may have been erased) at this point.
     offerTrail.push_back(
         ClaimOfferAtom(accountBID, offerID, wheat, numWheatReceived, sheep,
                        numSheepSend));

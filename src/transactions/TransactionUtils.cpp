@@ -139,9 +139,11 @@ static void acquireOrReleaseLiabilities(
 
 void acquireLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
-        LedgerStateEntry const& offer, LedgerStateEntry& account,
-        TrustLineWrapper& buyingTrust, TrustLineWrapper& sellingTrust)
+        LedgerStateEntry const& offer)
 {
+    LedgerStateEntry account;
+    TrustLineWrapper buyingTrust;
+    TrustLineWrapper sellingTrust;
     acquireOrReleaseLiabilities(ls, header, offer, account, buyingTrust,
                                 sellingTrust, true);
 }

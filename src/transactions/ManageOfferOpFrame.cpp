@@ -251,7 +251,6 @@ ManageOfferOpFrame::doApply(Application& app, AbstractLedgerState& lsOuter)
     newOffer.data.type(OFFER);
     if (offerID)
     { // modifying an old offer
-        auto header = ls.loadHeader();
         auto sellSheepOffer = stellar::loadOffer(ls, getSourceID(), offerID);
         if (!sellSheepOffer)
         {
@@ -268,9 +267,10 @@ ManageOfferOpFrame::doApply(Application& app, AbstractLedgerState& lsOuter)
         // executed. Both trust lines must be reset since it is possible that
         // the assets are updated (including the edge case that the buying and
         // selling assets are swapped).
+        auto header = ls.loadHeader();
         if (header.current().ledgerVersion >= 10)
         {
-            auto sourceAccount = loadSourceAccount(ls, header);
+            LedgerStateEntry sourceAccount;
             TrustLineWrapper wheatLineA;
             TrustLineWrapper sheepLineA;
             releaseLiabilities(ls, header, sellSheepOffer, sourceAccount,
@@ -472,11 +472,7 @@ ManageOfferOpFrame::doApply(Application& app, AbstractLedgerState& lsOuter)
 
         if (header.current().ledgerVersion >= 10)
         {
-            auto sourceAccount = loadSourceAccount(ls, header);
-            TrustLineWrapper wheatLineA;
-            TrustLineWrapper sheepLineA;
-            acquireLiabilities(ls, header, sellSheepOffer, sourceAccount,
-                               wheatLineA, sheepLineA);
+            acquireLiabilities(ls, header, sellSheepOffer);
         }
     }
     else

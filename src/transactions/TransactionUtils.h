@@ -35,8 +35,7 @@ loadTrustLineWithoutRecord(AbstractLedgerState& ls, AccountID const& accountID,
 
 void acquireLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
-        LedgerStateEntry const& offer, LedgerStateEntry& account,
-        TrustLineWrapper& buyingTrust, TrustLineWrapper& sellingTrust);
+        LedgerStateEntry const& offer);
 
 bool addBalance(LedgerStateHeader const& header, LedgerStateEntry& entry,
                 int64_t delta);
