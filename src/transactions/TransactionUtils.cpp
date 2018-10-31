@@ -61,6 +61,26 @@ loadTrustLineWithoutRecord(AbstractLedgerState& ls, AccountID const& accountID, 
     return ConstTrustLineWrapper(ls, accountID, asset);
 }
 
+TrustLineWrapper
+loadTrustLineIfNotNative(AbstractLedgerState& ls, AccountID const& accountID, Asset const& asset)
+{
+    if (asset.type() == ASSET_TYPE_NATIVE)
+    {
+        return {};
+    }
+    return TrustLineWrapper(ls, accountID, asset);
+}
+
+ConstTrustLineWrapper
+loadTrustLineWithoutRecordIfNotNative(AbstractLedgerState& ls, AccountID const& accountID, Asset const& asset)
+{
+    if (asset.type() == ASSET_TYPE_NATIVE)
+    {
+        return {};
+    }
+    return ConstTrustLineWrapper(ls, accountID, asset);
+}
+
 static void acquireOrReleaseLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
         LedgerStateEntry const& offerEntry, bool isAcquire)

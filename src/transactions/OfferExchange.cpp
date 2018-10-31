@@ -831,17 +831,10 @@ crossOffer(AbstractLedgerState& ls, LedgerStateEntry& sellingWheatOffer,
                 "invalid database state: offer must have matching account");
         }
 
-        ConstTrustLineWrapper wheatLineAccountB;
-        if (wheat.type() != ASSET_TYPE_NATIVE)
-        {
-            wheatLineAccountB = stellar::loadTrustLineWithoutRecord(ls, accountBID, wheat);
-        }
-
-        ConstTrustLineWrapper sheepLineAccountB;
-        if (sheep.type() != ASSET_TYPE_NATIVE)
-        {
-            sheepLineAccountB = stellar::loadTrustLineWithoutRecord(ls, accountBID, sheep);
-        }
+        auto sheepLineAccountB =
+            loadTrustLineWithoutRecordIfNotNative(ls, accountBID, sheep);
+        auto wheatLineAccountB =
+            loadTrustLineWithoutRecordIfNotNative(ls, accountBID, wheat);
 
         auto exchangeResult = performExchange(
             ls.loadHeader(), sellingWheatOffer, accountB, wheatLineAccountB,
@@ -955,18 +948,8 @@ crossOfferV10(AbstractLedgerState& ls, LedgerStateEntry& sellingWheatOffer,
 
     // Load necessary accounts and trustlines.
     auto accountB = stellar::loadAccount(ls, accountBID);
-
-    TrustLineWrapper wheatLineAccountB;
-    if (wheat.type() != ASSET_TYPE_NATIVE)
-    {
-        wheatLineAccountB = stellar::loadTrustLine(ls, accountBID, wheat);
-    }
-
-    TrustLineWrapper sheepLineAccountB;
-    if (sheep.type() != ASSET_TYPE_NATIVE)
-    {
-        sheepLineAccountB = stellar::loadTrustLine(ls, accountBID, sheep);
-    }
+    auto sheepLineAccountB = loadTrustLineIfNotNative(ls, accountBID, sheep);
+    auto wheatLineAccountB = loadTrustLineIfNotNative(ls, accountBID, wheat);
 
     // As of the protocol version 10, this call to adjustOffer should have no
     // effect. We leave it here only as a preventative measure.

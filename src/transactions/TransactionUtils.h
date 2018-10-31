@@ -33,6 +33,14 @@ ConstTrustLineWrapper
 loadTrustLineWithoutRecord(AbstractLedgerState& ls, AccountID const& accountID,
                            Asset const& asset);
 
+TrustLineWrapper
+loadTrustLineIfNotNative(AbstractLedgerState& ls, AccountID const& accountID,
+                         Asset const& asset);
+
+ConstTrustLineWrapper
+loadTrustLineWithoutRecordIfNotNative(
+    AbstractLedgerState& ls, AccountID const& accountID, Asset const& asset);
+
 void acquireLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
         LedgerStateEntry const& offer);

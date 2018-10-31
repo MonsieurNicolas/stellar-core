@@ -165,16 +165,8 @@ ManageOfferOpFrame::computeOfferExchangeParameters(
         }
     }
 
-    TrustLineWrapper sheepLineA;
-    TrustLineWrapper wheatLineA;
-    if (sheep.type() != ASSET_TYPE_NATIVE)
-    {
-        sheepLineA = stellar::loadTrustLine(ls, getSourceID(), sheep);
-    }
-    if (wheat.type() != ASSET_TYPE_NATIVE)
-    {
-        wheatLineA = stellar::loadTrustLine(ls, getSourceID(), wheat);
-    }
+    auto sheepLineA = loadTrustLineIfNotNative(ls, getSourceID(), sheep);
+    auto wheatLineA = loadTrustLineIfNotNative(ls, getSourceID(), wheat);
 
     maxWheatReceive = canBuyAtMost(header, sourceAccount, wheat, wheatLineA);
     if (ledgerVersion >= 10)
@@ -414,16 +406,10 @@ ManageOfferOpFrame::doApply(Application& app, AbstractLedgerState& lsOuter)
             if (sheepStays)
             {
                 auto sourceAccount = stellar::loadAccountWithoutRecord(ls, getSourceID());
-                ConstTrustLineWrapper sheepLineA;
-                ConstTrustLineWrapper wheatLineA;
-                if (sheep.type() != ASSET_TYPE_NATIVE)
-                {
-                    sheepLineA = stellar::loadTrustLineWithoutRecord(ls, getSourceID(), sheep);
-                }
-                if (wheat.type() != ASSET_TYPE_NATIVE)
-                {
-                    wheatLineA = stellar::loadTrustLineWithoutRecord(ls, getSourceID(), wheat);
-                }
+                auto sheepLineA =
+                    loadTrustLineWithoutRecordIfNotNative(ls, getSourceID(), sheep);
+                auto wheatLineA =
+                    loadTrustLineWithoutRecordIfNotNative(ls, getSourceID(), wheat);
 
                 OfferEntry& oe = newOffer.data.offer();
                 int64_t sheepSendLimit =
