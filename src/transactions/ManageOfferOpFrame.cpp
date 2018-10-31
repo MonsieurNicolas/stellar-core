@@ -270,11 +270,7 @@ ManageOfferOpFrame::doApply(Application& app, AbstractLedgerState& lsOuter)
         auto header = ls.loadHeader();
         if (header.current().ledgerVersion >= 10)
         {
-            LedgerStateEntry sourceAccount;
-            TrustLineWrapper wheatLineA;
-            TrustLineWrapper sheepLineA;
-            releaseLiabilities(ls, header, sellSheepOffer, sourceAccount,
-                               wheatLineA, sheepLineA);
+            releaseLiabilities(ls, header, sellSheepOffer);
         }
 
         // rebuild offer based off the manage offer

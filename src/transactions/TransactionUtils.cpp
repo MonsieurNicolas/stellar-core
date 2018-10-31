@@ -63,9 +63,7 @@ loadTrustLineWithoutRecord(AbstractLedgerState& ls, AccountID const& accountID, 
 
 static void acquireOrReleaseLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
-        LedgerStateEntry const& offerEntry, LedgerStateEntry& account,
-        TrustLineWrapper& buyingTrust, TrustLineWrapper& sellingTrust,
-        bool isAcquire)
+        LedgerStateEntry const& offerEntry, bool isAcquire)
 {
     // This should never happen
     auto const& offer = offerEntry.current().data.offer();
@@ -75,25 +73,22 @@ static void acquireOrReleaseLiabilities(
     }
     auto const& sellerID = offer.sellerID;
 
-    auto loadAccountIfNecessaryAndValidate = [&ls, &account, &sellerID]() {
+    auto loadAccountAndValidate = [&ls, &sellerID]() {
+        auto account = stellar::loadAccount(ls, sellerID);
         if (!account)
         {
-            account = stellar::loadAccount(ls, sellerID);
-            assert(account);
+            throw std::runtime_error("account does not exist");
         }
-        assert(account.current().data.account().accountID == sellerID);
+        return account;
     };
 
-    auto loadTrustIfNecessaryAndValidate = [&ls, &sellerID](
-                                               TrustLineWrapper& trust,
-                                               Asset const& asset) {
+    auto loadTrustAndValidate = [&ls, &sellerID](Asset const& asset) {
+        auto trust = stellar::loadTrustLine(ls, sellerID, asset);
         if (!trust)
         {
-            trust = stellar::loadTrustLine(ls, sellerID, asset);
-            assert(trust);
+            throw std::runtime_error("trustline does not exist");
         }
-        assert(trust.getAccountID() == sellerID);
-        assert(trust.getAsset() == asset);
+        return trust;
     };
 
     int64_t buyingLiabilities =
@@ -101,7 +96,7 @@ static void acquireOrReleaseLiabilities(
                   : -getOfferBuyingLiabilities(header, offerEntry);
     if (offer.buying.type() == ASSET_TYPE_NATIVE)
     {
-        loadAccountIfNecessaryAndValidate();
+        auto account = loadAccountAndValidate();
         if (!addBuyingLiabilities(header, account, buyingLiabilities))
         {
             throw std::runtime_error("could not add buying liabilities");
@@ -109,7 +104,7 @@ static void acquireOrReleaseLiabilities(
     }
     else
     {
-        loadTrustIfNecessaryAndValidate(buyingTrust, offer.buying);
+        auto buyingTrust = loadTrustAndValidate(offer.buying);
         if (!buyingTrust.addBuyingLiabilities(header, buyingLiabilities))
         {
             throw std::runtime_error("could not add buying liabilities");
@@ -121,7 +116,7 @@ static void acquireOrReleaseLiabilities(
                   : -getOfferSellingLiabilities(header, offerEntry);
     if (offer.selling.type() == ASSET_TYPE_NATIVE)
     {
-        loadAccountIfNecessaryAndValidate();
+        auto account = loadAccountAndValidate();
         if (!addSellingLiabilities(header, account, sellingLiabilities))
         {
             throw std::runtime_error("could not add selling liabilities");
@@ -129,7 +124,7 @@ static void acquireOrReleaseLiabilities(
     }
     else
     {
-        loadTrustIfNecessaryAndValidate(sellingTrust, offer.selling);
+        auto sellingTrust = loadTrustAndValidate(offer.selling);
         if (!sellingTrust.addSellingLiabilities(header, sellingLiabilities))
         {
             throw std::runtime_error("could not add selling liabilities");
@@ -141,11 +136,7 @@ void acquireLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
         LedgerStateEntry const& offer)
 {
-    LedgerStateEntry account;
-    TrustLineWrapper buyingTrust;
-    TrustLineWrapper sellingTrust;
-    acquireOrReleaseLiabilities(ls, header, offer, account, buyingTrust,
-                                sellingTrust, true);
+    acquireOrReleaseLiabilities(ls, header, offer, true);
 }
 
 bool addBalance(LedgerStateHeader const& header, LedgerStateEntry& entry,
@@ -614,11 +605,9 @@ void normalizeSigners(LedgerStateEntry& entry)
 
 void releaseLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
-        LedgerStateEntry const& offer, LedgerStateEntry& account,
-        TrustLineWrapper& buyingTrust, TrustLineWrapper& sellingTrust)
+        LedgerStateEntry const& offer)
 {
-    acquireOrReleaseLiabilities(ls, header, offer, account, buyingTrust,
-                                sellingTrust, false);
+    acquireOrReleaseLiabilities(ls, header, offer, false);
 }
 
 void setAuthorized(LedgerStateEntry& entry, bool authorized)

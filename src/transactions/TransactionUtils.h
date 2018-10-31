@@ -108,8 +108,7 @@ void normalizeSigners(LedgerStateEntry& entry);
 
 void releaseLiabilities(
         AbstractLedgerState& ls, LedgerStateHeader const& header,
-        LedgerStateEntry const& offer, LedgerStateEntry& account,
-        TrustLineWrapper& buyingTrust, TrustLineWrapper& sellingTrust);
+        LedgerStateEntry const& offer);
 
 void setAuthorized(LedgerStateEntry& entry, bool authorized);
 }

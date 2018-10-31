@@ -133,11 +133,8 @@ AllowTrustOpFrame::doApply(Application& app, AbstractLedgerState& ls)
                 throw std::runtime_error("Offer not buying or selling expected asset");
             }
 
-            LedgerStateEntry trustAcc;
-            TrustLineWrapper buyingTrust;
-            TrustLineWrapper sellingTrust;
-            releaseLiabilities(ls, header, offer, trustAcc, buyingTrust,
-                               sellingTrust);
+            releaseLiabilities(ls, header, offer);
+            auto trustAcc = stellar::loadAccount(ls, mAllowTrust.trustor);
             addNumEntries(header, trustAcc, -1);
             offer.erase();
         }

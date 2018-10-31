@@ -951,14 +951,22 @@ crossOfferV10(AbstractLedgerState& ls, LedgerStateEntry& sellingWheatOffer,
     }
 
     // Remove liabilities associated with the offer being crossed.
-    LedgerStateEntry accountB;
-    TrustLineWrapper sheepLineAccountB;
+    releaseLiabilities(ls, header, sellingWheatOffer);
+
+    // Load necessary accounts and trustlines.
+    auto accountB = stellar::loadAccount(ls, accountBID);
+
     TrustLineWrapper wheatLineAccountB;
-    releaseLiabilities(ls, header, sellingWheatOffer, accountB,
-                       sheepLineAccountB, wheatLineAccountB);
-    // accountB is loaded at this point if either asset is native
-    // sheepLineAccountB is loaded if sheep is not native
-    // wheatLineAccountB is loaded if wheat is not native
+    if (wheat.type() != ASSET_TYPE_NATIVE)
+    {
+        wheatLineAccountB = stellar::loadTrustLine(ls, accountBID, wheat);
+    }
+
+    TrustLineWrapper sheepLineAccountB;
+    if (sheep.type() != ASSET_TYPE_NATIVE)
+    {
+        sheepLineAccountB = stellar::loadTrustLine(ls, accountBID, sheep);
+    }
 
     // As of the protocol version 10, this call to adjustOffer should have no
     // effect. We leave it here only as a preventative measure.
