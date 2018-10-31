@@ -100,9 +100,10 @@ AllowTrustOpFrame::doApply(Application& app, AbstractLedgerState& ls)
     key.trustLine().accountID = mAllowTrust.trustor;
     key.trustLine().asset = ci;
 
+    bool didRevokeAuth = false;
     {
-        auto trustLineEntry = ls.load(key);
-        if (!trustLineEntry)
+        auto trust = ls.load(key);
+        if (!trust)
         {
             app.getMetrics()
                 .NewMeter({"op-allow-trust", "failure", "no-trust-line"},
@@ -111,38 +112,34 @@ AllowTrustOpFrame::doApply(Application& app, AbstractLedgerState& ls)
             innerResult().code(ALLOW_TRUST_NO_TRUST_LINE);
             return false;
         }
+        didRevokeAuth = isAuthorized(trust) && !mAllowTrust.authorize;
+    }
 
-        TrustLineWrapper trustLine(std::move(trustLineEntry));
-        bool wasAuthorized = trustLine.isAuthorized();
-        bool didRevokeAuth = wasAuthorized && !mAllowTrust.authorize;
-        auto header = ls.loadHeader();
-        if (header.current().ledgerVersion >= 10 && didRevokeAuth)
+    auto header = ls.loadHeader();
+    if (header.current().ledgerVersion >= 10 && didRevokeAuth)
+    {
+        // Delete all offers owned by the trustor that are either buying or
+        // selling the asset which had authorization revoked.
+        auto offers = ls.loadOffersByAccountAndAsset(mAllowTrust.trustor, ci);
+        for (auto& offer : offers)
         {
-            // Delete all offers owned by the trustor that are either buying or
-            // selling the asset which had authorization revoked.
-            auto offers = ls.loadOffersByAccountAndAsset(mAllowTrust.trustor, ci);
-            if (!offers.empty())
+            auto const& oe = offer.current().data.offer();
+            if (!(oe.sellerID == mAllowTrust.trustor))
             {
-                auto trustAcc = stellar::loadAccount(ls, mAllowTrust.trustor);
-                for (auto& offer : offers)
-                {
-                    auto const& oe = offer.current().data.offer();
-                    if (oe.buying == ci)
-                    {
-                        TrustLineWrapper sellingTrustLine;
-                        releaseLiabilities(ls, header, offer, trustAcc, trustLine,
-                                           sellingTrustLine);
-                    }
-                    else if (oe.selling == ci)
-                    {
-                        TrustLineWrapper buyingTrustLine;
-                        releaseLiabilities(ls, header, offer, trustAcc,
-                                           buyingTrustLine, trustLine);
-                    }
-                    addNumEntries(header, trustAcc, -1);
-                    offer.erase();
-                }
+                throw std::runtime_error("Offer not owned by expected account");
             }
+            else if (!(oe.buying == ci || oe.selling == ci))
+            {
+                throw std::runtime_error("Offer not buying or selling expected asset");
+            }
+
+            LedgerStateEntry trustAcc;
+            TrustLineWrapper buyingTrust;
+            TrustLineWrapper sellingTrust;
+            releaseLiabilities(ls, header, offer, trustAcc, buyingTrust,
+                               sellingTrust);
+            addNumEntries(header, trustAcc, -1);
+            offer.erase();
         }
     }
 
