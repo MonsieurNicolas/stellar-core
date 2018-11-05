@@ -1091,10 +1091,8 @@ LedgerStateRoot::LedgerStateRoot(Database& db, size_t entryCacheSize,
 LedgerStateRoot::Impl::Impl(Database& db, size_t entryCacheSize,
                             size_t bestOfferCacheSize)
     : mDatabase(db), mHeader(std::make_unique<LedgerHeader>())
-    , mEntryCacheSize(entryCacheSize)
-    , mEntryCache(std::make_unique<EntryCache>(mEntryCacheSize))
-    , mBestOffersCache(
-            std::make_unique<BestOffersCache>(bestOfferCacheSize))
+    , mEntryCache(entryCacheSize)
+    , mBestOffersCache(bestOfferCacheSize)
     , mChild(nullptr)
 {
 }
@@ -1183,8 +1181,8 @@ LedgerStateRoot::Impl::commitChild(EntryIterator iter)
     }
 
     // Clearing the cache does not throw
-    mBestOffersCache->clear();
-    mEntryCache->clear();
+    mBestOffersCache.clear();
+    mEntryCache.clear();
 
     // std::unique_ptr<...>::reset does not throw
     mTransaction.reset();
@@ -1267,8 +1265,8 @@ LedgerStateRoot::Impl::deleteObjectsModifiedOnOrAfterLedger(
 {
     using namespace soci;
     throwIfChild();
-    mEntryCache->clear();
-    mBestOffersCache->clear();
+    mEntryCache.clear();
+    mBestOffersCache.clear();
 
     {
         std::string query =
@@ -1369,12 +1367,16 @@ LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
     // that the lists of best offers remain properly sorted. The sort order is
     // that determined by loadBestOffers and isBetterOffer (both induce the same
     // order).
+    BestOffersCacheEntry emptyCacheEntry{{}, false};
     auto cacheKey = getBestOffersCacheKey(buying, selling);
-    if (!mBestOffersCache->exists(cacheKey))
+    if (!mBestOffersCache.exists(cacheKey))
     {
-        putInBestOffersCache(cacheKey, {{}, false});
+        putInBestOffersCache(cacheKey, emptyCacheEntry);
     }
-    auto& cached = getFromBestOffersCache(cacheKey);
+
+    // Have to check again in case the max cache size is 0 or the put throws
+    auto& cached = mBestOffersCache.exists(cacheKey)
+        ? getFromBestOffersCache(cacheKey) : emptyCacheEntry;
     auto& offers = cached.bestOffers;
 
     auto res = findIncludedOffer(offers.cbegin(), offers.cend(), exclude);
@@ -1472,7 +1474,7 @@ std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
 {
     auto cacheKey = getEntryCacheKey(key);
-    if (mEntryCache->exists(cacheKey))
+    if (mEntryCache.exists(cacheKey))
     {
         return getFromEntryCache(cacheKey);
     }
@@ -1597,11 +1599,11 @@ LedgerStateRoot::Impl::getFromEntryCache(EntryCacheKey const& cacheKey) const
 {
     try
     {
-        return mEntryCache->get(cacheKey);
+        return mEntryCache.get(cacheKey);
     }
     catch (...)
     {
-        mEntryCache->clear();
+        mEntryCache.clear();
         throw;
     }
 }
@@ -1613,11 +1615,11 @@ LedgerStateRoot::Impl::putInEntryCache(
 {
     try
     {
-        mEntryCache->put(cacheKey, entry);
+        mEntryCache.put(cacheKey, entry);
     }
     catch (...)
     {
-        mEntryCache->clear();
+        mEntryCache.clear();
         throw;
     }
 }
@@ -1636,11 +1638,11 @@ LedgerStateRoot::Impl::getFromBestOffersCache(
 {
     try
     {
-        return mBestOffersCache->get(cacheKey);
+        return mBestOffersCache.get(cacheKey);
     }
     catch (...)
     {
-        mBestOffersCache->clear();
+        mBestOffersCache.clear();
         throw;
     }
 }
@@ -1651,11 +1653,11 @@ LedgerStateRoot::Impl::putInBestOffersCache(
 {
     try
     {
-        mBestOffersCache->put(cacheKey, entry);
+        mBestOffersCache.put(cacheKey, entry);
     }
     catch (...)
     {
-        mBestOffersCache->clear();
+        mBestOffersCache.clear();
         throw;
     }
 }

@@ -479,8 +479,8 @@ void
 LedgerStateRoot::Impl::dropOffers()
 {
     throwIfChild();
-    mEntryCache->clear();
-    mBestOffersCache->clear();
+    mEntryCache.clear();
+    mBestOffersCache.clear();
 
     mDatabase.getSession() << "DROP TABLE IF EXISTS offers;";
     mDatabase.getSession() <<

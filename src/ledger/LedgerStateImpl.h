@@ -263,9 +263,8 @@ class LedgerStateRoot::Impl
 
     Database& mDatabase;
     std::unique_ptr<LedgerHeader> mHeader;
-    size_t mEntryCacheSize;
-    std::unique_ptr<EntryCache> mEntryCache;
-    std::unique_ptr<BestOffersCache> mBestOffersCache;
+    mutable EntryCache mEntryCache;
+    mutable BestOffersCache mBestOffersCache;
     std::unique_ptr<soci::transaction> mTransaction;
     AbstractLedgerState* mChild;
 

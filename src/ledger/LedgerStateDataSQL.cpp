@@ -115,8 +115,8 @@ void
 LedgerStateRoot::Impl::dropData()
 {
     throwIfChild();
-    mEntryCache->clear();
-    mBestOffersCache->clear();
+    mEntryCache.clear();
+    mBestOffersCache.clear();
 
     mDatabase.getSession() << "DROP TABLE IF EXISTS accountdata;";
     mDatabase.getSession() <<
