@@ -751,6 +751,10 @@ LedgerState::Impl::getOffersByAccountAndAsset(AccountID const& account,
         {
             offers[key] = *entry;
         }
+        else
+        {
+            offers.erase(key);
+        }
     }
     return offers;
 }
