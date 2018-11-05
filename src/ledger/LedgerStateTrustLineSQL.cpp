@@ -202,8 +202,8 @@ void
 LedgerStateRoot::Impl::dropTrustLines()
 {
     throwIfChild();
-    mEntryCache->clear();
-    mBestOffersCache->clear();
+    mEntryCache.clear();
+    mBestOffersCache.clear();
 
     mDatabase.getSession() << "DROP TABLE IF EXISTS trustlines;";
     mDatabase.getSession() <<

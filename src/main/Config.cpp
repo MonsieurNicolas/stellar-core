@@ -91,6 +91,9 @@ Config::Config() : NODE_SEED(SecretKey::random())
 
     DATABASE = SecretValue{"sqlite3://:memory:"};
     NTP_SERVER = "pool.ntp.org";
+
+    ENTRY_CACHE_SIZE = 4096;
+    BEST_OFFERS_CACHE_SIZE = 64;
 }
 
 namespace
