@@ -21,26 +21,6 @@
 
 using namespace stellar;
 
-TEST_CASE("Ledger entry db lifecycle", "[ledger]")
-{
-    Config cfg(getTestConfig());
-    VirtualClock clock;
-    Application::pointer app = createTestApplication(clock, cfg);
-    app->start();
-
-    LedgerState ls(app->getLedgerStateRoot());
-    for (size_t i = 0; i < 100; ++i)
-    {
-        auto le = LedgerTestUtils::generateValidLedgerEntry(3);
-        auto key = LedgerEntryKey(le);
-        REQUIRE(!ls.load(key));
-        ls.create(le);
-        REQUIRE(ls.load(key).current() == le);
-        ls.erase(LedgerEntryKey(le));
-        REQUIRE(!ls.load(key));
-    }
-}
-
 TEST_CASE("cannot close ledger with unsupported ledger version", "[ledger]")
 {
     VirtualClock clock;
