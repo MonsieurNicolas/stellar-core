@@ -654,6 +654,11 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
             [] (auto const& val) {
                 return val.second != 0;
             });
+    // Equivalent to maxWinners + numChanged > MAX
+    if (std::numeric_limits<size_t>::max() - numChanged < maxWinners)
+    {
+        throw std::runtime_error("max winners overflowed");
+    }
     size_t newMaxWinners = maxWinners + numChanged;
 
     // Have to load accounts that could be winners after accounting for the
@@ -664,7 +669,8 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
                return lhs.second < rhs.second;
             })->second;
     maxIncrease = std::max(int64_t(0), maxIncrease);
-    int64_t newMinVotes = std::max(int64_t(0), minVotes - maxIncrease);
+    int64_t newMinVotes =
+        (minVotes > maxIncrease) ? (minVotes - maxIncrease) : 0;
 
     // Get winners from parent, update votes, and add potential new winners
     // Note: It is possible that there are new winners in the case where an
@@ -676,6 +682,20 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
 
     // Enumerate the new winners in sorted order
     return enumerateInflationWinners(totalVotes, maxWinners, minVotes);
+}
+
+std::vector<InflationWinner>
+LedgerState::queryInflationWinners(size_t maxWinners, int64_t minVotes)
+{
+    return getImpl()->queryInflationWinners(maxWinners, minVotes);
+}
+
+std::vector<InflationWinner>
+LedgerState::Impl::queryInflationWinners(size_t maxWinners, int64_t minVotes)
+{
+    throwIfSealed();
+    throwIfChild();
+    return getInflationWinners(maxWinners, minVotes);
 }
 
 std::vector<LedgerEntry>

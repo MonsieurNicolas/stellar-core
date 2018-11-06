@@ -60,7 +60,7 @@ InflationOpFrame::doApply(Application& app, AbstractLedgerState& ls)
     int64_t minBalance =
         bigDivide(totalVotes, INFLATION_WIN_MIN_PERCENT, TRILLION, ROUND_DOWN);
 
-    auto winners = ls.getInflationWinners(INFLATION_NUM_WINNERS, minBalance);
+    auto winners = ls.queryInflationWinners(INFLATION_NUM_WINNERS, minBalance);
 
     auto inflationAmount = bigDivide(lh.totalCoins, INFLATION_RATE_TRILLIONTHS,
                                      TRILLION, ROUND_DOWN);

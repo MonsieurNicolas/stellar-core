@@ -158,6 +158,13 @@ class LedgerState::Impl
     std::vector<InflationWinner>
     getInflationWinners(size_t maxWinners, int64_t minBalance);
 
+    // queryInflationWinners has the basic exception safety guarantee. If it
+    // throws an exception, then
+    // - the prepared statement cache may be, but is not guaranteed to be,
+    //   modified
+    std::vector<InflationWinner>
+    queryInflationWinners(size_t maxWinners, int64_t minBalance);
+
     // getLiveEntries has the strong exception safety guarantee
     std::vector<LedgerEntry> getLiveEntries();
 

@@ -246,6 +246,12 @@ class AbstractLedgerState : public AbstractLedgerStateParent
     loadOffersByAccountAndAsset(AccountID const& accountID,
                                 Asset const& asset) = 0;
 
+    // queryInflationWinners is a wrapper around getInflationWinners that throws
+    // if the AbstractLedgerState is sealed or if the AbstractLedgerState has a
+    // child.
+    virtual std::vector<InflationWinner>
+    queryInflationWinners(size_t maxWinners, int64_t minBalance) = 0;
+
     // unsealHeader is used to modify the LedgerHeader after AbstractLedgerState
     // has entered the sealed state. This is required to update bucketListHash,
     // which can only be done after getDeadEntries and getLiveEntries have been
@@ -300,6 +306,9 @@ class LedgerState final : public AbstractLedgerState
 
     std::vector<InflationWinner>
     getInflationWinners(size_t maxWinners, int64_t minBalance) override;
+
+    std::vector<InflationWinner>
+    queryInflationWinners(size_t maxWinners, int64_t minBalance) override;
 
     std::vector<LedgerEntry> getLiveEntries() override;
 
