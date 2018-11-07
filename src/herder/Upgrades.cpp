@@ -494,7 +494,7 @@ updateOffer(
     std::map<Asset, Liabilities>& liabilities,
     std::map<Asset, std::unique_ptr<int64_t>> const& initialBuyingLiabilities,
     std::map<Asset, std::unique_ptr<int64_t>> const& initialSellingLiabilities,
-    AbstractLedgerState& ls)
+    AbstractLedgerState& ls, LedgerStateHeader const& header)
 {
     using namespace std::placeholders;
     auto& offer = offerEntry.current().data.offer();
@@ -547,7 +547,7 @@ updateOffer(
             !(offer.sellerID == getIssuer(offer.buying)))
         {
             if (!stellar::addBalance(liabilities[offer.buying].buying,
-                                     getOfferBuyingLiabilities(ls.loadHeader(), offerEntry)))
+                                     getOfferBuyingLiabilities(header, offerEntry)))
             {
                 throw std::runtime_error("could not add buying "
                                          "liabilities");
@@ -557,7 +557,7 @@ updateOffer(
             !(offer.sellerID == getIssuer(offer.selling)))
         {
             if (!stellar::addBalance(liabilities[offer.selling].selling,
-                                     getOfferSellingLiabilities(ls.loadHeader(), offerEntry)))
+                                     getOfferSellingLiabilities(header, offerEntry)))
             {
                 throw std::runtime_error("could not add selling "
                                          "liabilities");
@@ -578,7 +578,7 @@ updateOffer(
 // using the initial result of step (1), so it does not matter what order the
 // offers are processed.
 static void
-prepareLiabilities(AbstractLedgerState& ls)
+prepareLiabilities(AbstractLedgerState& ls, LedgerStateHeader const& header)
 {
     CLOG(INFO, "Ledger") << "Starting prepareLiabilities";
 
@@ -600,9 +600,9 @@ prepareLiabilities(AbstractLedgerState& ls)
         {
             auto const& offer = offerEntry.current().data.offer();
             addLiabilities(initialBuyingLiabilities, offer.sellerID,
-                           offer.buying, getOfferBuyingLiabilities(ls.loadHeader(), offerEntry));
+                           offer.buying, getOfferBuyingLiabilities(header, offerEntry));
             addLiabilities(initialSellingLiabilities, offer.sellerID,
-                           offer.selling, getOfferSellingLiabilities(ls.loadHeader(), offerEntry));
+                           offer.selling, getOfferSellingLiabilities(header, offerEntry));
         }
 
         auto accountEntry = stellar::loadAccount(ls, accountOffers.first);
@@ -616,7 +616,7 @@ prepareLiabilities(AbstractLedgerState& ls)
         // balanceAboveReserve must exclude native selling liabilities, since
         // these are in the process of being recalculated from scratch.
         int64_t balance = acc.balance;
-        int64_t minBalance = getMinBalance(ls.loadHeader(), acc.numSubEntries);
+        int64_t minBalance = getMinBalance(header, acc.numSubEntries);
         int64_t balanceAboveReserve = balance - minBalance;
 
         std::map<Asset, Liabilities> liabilities;
@@ -625,11 +625,11 @@ prepareLiabilities(AbstractLedgerState& ls)
             auto offerID = offerEntry.current().data.offer().offerID;
             auto res = updateOffer(offerEntry, balance, balanceAboveReserve,
                                    liabilities, initialBuyingLiabilities,
-                                   initialSellingLiabilities, ls);
+                                   initialSellingLiabilities, ls, header);
             if (res == UpdateOfferResult::AdjustedToZero ||
                 res == UpdateOfferResult::Erased)
             {
-                stellar::addNumEntries(ls.loadHeader(), accountEntry, -1);
+                stellar::addNumEntries(header, accountEntry, -1);
             }
 
             ++nUpdatedOffers[res];
@@ -663,16 +663,16 @@ prepareLiabilities(AbstractLedgerState& ls)
             {
                 int64_t deltaSelling =
                     liab.selling -
-                    getSellingLiabilities(ls.loadHeader(), accountEntry);
+                    getSellingLiabilities(header, accountEntry);
                 int64_t deltaBuying =
                     liab.buying -
-                    getBuyingLiabilities(ls.loadHeader(), accountEntry);
-                if (!addSellingLiabilities(ls.loadHeader(), accountEntry, deltaSelling))
+                    getBuyingLiabilities(header, accountEntry);
+                if (!addSellingLiabilities(header, accountEntry, deltaSelling))
                 {
                     throw std::runtime_error("invalid selling liabilities "
                                              "during upgrade");
                 }
-                if (!addBuyingLiabilities(ls.loadHeader(), accountEntry, deltaBuying))
+                if (!addBuyingLiabilities(header, accountEntry, deltaBuying))
                 {
                     throw std::runtime_error("invalid buying liabilities "
                                              "during upgrade");
@@ -684,21 +684,21 @@ prepareLiabilities(AbstractLedgerState& ls)
                     stellar::loadTrustLine(ls, accountOffers.first, asset);
                 int64_t deltaSelling =
                     liab.selling -
-                    trustEntry.getSellingLiabilities(ls.loadHeader());
+                    trustEntry.getSellingLiabilities(header);
                 int64_t deltaBuying =
                     liab.buying -
-                    trustEntry.getBuyingLiabilities(ls.loadHeader());
+                    trustEntry.getBuyingLiabilities(header);
                 if (deltaSelling != 0 || deltaBuying != 0)
                 {
                     ++nChangedTrustLines;
                 }
 
-                if (!trustEntry.addSellingLiabilities(ls.loadHeader(), deltaSelling))
+                if (!trustEntry.addSellingLiabilities(header, deltaSelling))
                 {
                     throw std::runtime_error("invalid selling liabilities "
                                              "during upgrade");
                 }
-                if (!trustEntry.addBuyingLiabilities(ls.loadHeader(), deltaBuying))
+                if (!trustEntry.addBuyingLiabilities(header, deltaBuying))
                 {
                     throw std::runtime_error("invalid buying liabilities "
                                              "during upgrade");
@@ -732,8 +732,7 @@ Upgrades::applyVersionUpgrade(AbstractLedgerState& ls, uint32_t newVersion)
     header.current().ledgerVersion = newVersion;
     if (header.current().ledgerVersion >= 10 && prevVersion < 10)
     {
-        header.deactivate();
-        prepareLiabilities(ls);
+        prepareLiabilities(ls, header);
     }
 }
 
@@ -747,8 +746,7 @@ Upgrades::applyReserveUpgrade(AbstractLedgerState& ls, uint32_t newReserve)
     header.current().baseReserve = newReserve;
     if (header.current().ledgerVersion >= 10 && didReserveIncrease)
     {
-        header.deactivate();
-        prepareLiabilities(ls);
+        prepareLiabilities(ls, header);
     }
 }
 }
