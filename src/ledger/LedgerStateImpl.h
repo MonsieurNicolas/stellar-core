@@ -25,6 +25,16 @@ class EntryIterator::AbstractImpl
     virtual LedgerKey const& key() const = 0;
 };
 
+// Many functions in LedgerState::Impl provide a basic exception safety
+// guarantee that states that certain caches may be modified or cleared if an
+// exception is thrown. It is always safe to continue using the LedgerState
+// object in such a case and the results of any successful query are correct.
+// However, it should be noted that a query which would have succeeded had there
+// not been an earlier exception may fail in the case where there had been an
+// earlier exception. This could occur, for example, if in the first case the
+// query would have hit the cache but in the second case the query hits the
+// database because the cache has been cleared but the database connection has
+// been lost.
 class LedgerState::Impl
 {
     class EntryIteratorImpl;
@@ -253,6 +263,16 @@ class LedgerState::Impl::EntryIteratorImpl
     LedgerKey const& key() const override;
 };
 
+// Many functions in LedgerStateRoot::Impl provide a basic exception safety
+// guarantee that states that certain caches may be modified or cleared if an
+// exception is thrown. It is always safe to continue using the LedgerState
+// object in such a case and the results of any successful query are correct.
+// However, it should be noted that a query which would have succeeded had there
+// not been an earlier exception may fail in the case where there had been an
+// earlier exception. This could occur, for example, if in the first case the
+// query would have hit the cache but in the second case the query hits the
+// database because the cache has been cleared but the database connection has
+// been lost.
 class LedgerStateRoot::Impl
 {
     typedef std::string EntryCacheKey;
