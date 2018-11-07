@@ -1037,8 +1037,10 @@ crossOfferV10(AbstractLedgerState& ls, LedgerStateEntry& sellingWheatOffer,
         lsInner.commit();
     }
 
-    // Note: Cannot use sellingWheatOffer or offer (which is a reference) since
-    // it is not active (and may have been erased) at this point.
+    // Note: The previous block creates a nested LedgerState so all entries are
+    // deactivated at this point. Specifically, you cannot use sellingWheatOffer
+    // or offer (which is a reference) since it is not active (and may have been
+    // erased) at this point.
     offerTrail.push_back(
         ClaimOfferAtom(accountBID, offerID, wheat, numWheatReceived, sheep,
                        numSheepSend));
