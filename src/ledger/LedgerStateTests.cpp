@@ -20,7 +20,7 @@
 
 using namespace stellar;
 
-void validate(AbstractLedgerState& ls,
+static void validate(AbstractLedgerState& ls,
               std::map<LedgerKey, LedgerStateDelta::EntryDelta> const& expected)
 {
     auto const delta = ls.getDelta();
@@ -47,7 +47,7 @@ void validate(AbstractLedgerState& ls,
     REQUIRE(iter == delta.entry.end());
 }
 
-LedgerEntry generateLedgerEntryWithSameKey(LedgerEntry const& leBase)
+static LedgerEntry generateLedgerEntryWithSameKey(LedgerEntry const& leBase)
 {
     LedgerEntry le;
     le.data.type(leBase.data.type());
@@ -557,7 +557,7 @@ TEST_CASE("LedgerState erase", "[ledgerstate]")
     }
 }
 
-void applyLedgerStateUpdates(
+static void applyLedgerStateUpdates(
     AbstractLedgerState& ls,
     std::map<AccountID, std::pair<AccountID, int64_t>> const& updates)
 {
@@ -592,7 +592,7 @@ void applyLedgerStateUpdates(
     }
 }
 
-void testInflationWinners(
+static void testInflationWinners(
     AbstractLedgerStateParent& lsParent, size_t maxWinners, int64_t minBalance,
     std::vector<std::tuple<AccountID, uint64_t>> const& expected,
     std::vector<std::map<AccountID, std::pair<AccountID, int64_t>>>::const_iterator begin,
@@ -623,7 +623,7 @@ void testInflationWinners(
     }
 }
 
-void testInflationWinners(
+static void testInflationWinners(
     size_t maxWinners, int64_t minBalance,
     std::vector<std::tuple<AccountID, uint64_t>> const& expected,
     std::vector<std::map<AccountID, std::pair<AccountID, int64_t>>> const& updates)
@@ -1070,7 +1070,7 @@ TEST_CASE("LedgerState loadWithoutRecord", "[ledgerstate]")
     }
 }
 
-void applyLedgerStateUpdates(
+static void applyLedgerStateUpdates(
     AbstractLedgerState& ls,
     std::map<std::pair<AccountID, uint64_t>,
              std::tuple<Asset, Asset, int64_t>> const& updates)
@@ -1104,7 +1104,7 @@ void applyLedgerStateUpdates(
     }
 }
 
-void testAllOffers(
+static void testAllOffers(
     AbstractLedgerStateParent& lsParent,
     std::map<AccountID, std::vector<std::tuple<uint64_t, Asset, Asset, int64_t>>> const& expected,
     std::vector<std::map<std::pair<AccountID, uint64_t>,
@@ -1152,7 +1152,7 @@ void testAllOffers(
     }
 }
 
-void testAllOffers(
+static void testAllOffers(
     std::map<AccountID, std::vector<std::tuple<uint64_t, Asset, Asset, int64_t>>> const& expected,
     std::vector<std::map<std::pair<AccountID, uint64_t>,
                          std::tuple<Asset, Asset, int64_t>>> const& updates)
@@ -1325,7 +1325,7 @@ TEST_CASE("LedgerState loadAllOffers", "[ledgerstate]")
     }
 }
 
-void applyLedgerStateUpdates(
+static void applyLedgerStateUpdates(
     AbstractLedgerState& ls,
     std::map<std::pair<AccountID, uint64_t>,
              std::tuple<Asset, Asset, Price, int64_t>> const& updates)
@@ -1359,7 +1359,7 @@ void applyLedgerStateUpdates(
     }
 }
 
-void testBestOffer(
+static void testBestOffer(
     AbstractLedgerStateParent& lsParent, Asset const& buying, Asset const& selling,
     std::vector<std::tuple<uint64_t, Asset, Asset, Price, int64_t>> const& expected,
     std::vector<std::map<std::pair<AccountID, uint64_t>,
@@ -1391,7 +1391,7 @@ void testBestOffer(
     }
 }
 
-void testBestOffer(
+static void testBestOffer(
     Asset const& buying, Asset const& selling,
     std::vector<std::tuple<uint64_t, Asset, Asset, Price, int64_t>> const& expected,
     std::vector<std::map<std::pair<AccountID, uint64_t>,
@@ -1579,7 +1579,7 @@ TEST_CASE("LedgerState loadBestOffer", "[ledgerstate]")
     }
 }
 
-void testOffersByAccountAndAsset(
+static void testOffersByAccountAndAsset(
     AbstractLedgerStateParent& lsParent, AccountID const& accountID,
     Asset const& asset, std::vector<std::tuple<uint64_t, Asset, Asset, int64_t>> const& expected,
     std::vector<std::map<std::pair<AccountID, uint64_t>,
@@ -1612,7 +1612,7 @@ void testOffersByAccountAndAsset(
     }
 }
 
-void testOffersByAccountAndAsset(
+static void testOffersByAccountAndAsset(
     AccountID const& accountID, Asset const& asset,
     std::vector<std::tuple<uint64_t, Asset, Asset, int64_t>> const& expected,
     std::vector<std::map<std::pair<AccountID, uint64_t>,
