@@ -22,6 +22,8 @@ class TrustLineWrapper
 
     std::unique_ptr<AbstractImpl> mImpl;
 
+    std::unique_ptr<AbstractImpl> const& getImpl() const;
+
   public:
     TrustLineWrapper();
     TrustLineWrapper(AbstractLedgerState& ls, AccountID const& accountID, Asset const& asset);
@@ -101,6 +103,8 @@ class ConstTrustLineWrapper
     class NonIssuerImpl;
 
     std::unique_ptr<AbstractImpl> mImpl;
+
+    std::unique_ptr<AbstractImpl> const& getImpl() const;
 
   public:
     ConstTrustLineWrapper();

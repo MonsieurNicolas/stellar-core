@@ -121,77 +121,87 @@ TrustLineWrapper::operator bool() const
 AccountID const&
 TrustLineWrapper::getAccountID() const
 {
-    return mImpl->getAccountID();
+    return getImpl()->getAccountID();
 }
 
 Asset const&
 TrustLineWrapper::getAsset() const
 {
-    return mImpl->getAsset();
+    return getImpl()->getAsset();
 }
 
 int64_t
 TrustLineWrapper::getBalance() const
 {
-    return mImpl->getBalance();
+    return getImpl()->getBalance();
 }
 
 bool
 TrustLineWrapper::addBalance(LedgerStateHeader const& header,
                              int64_t delta)
 {
-    return mImpl->addBalance(header, delta);
+    return getImpl()->addBalance(header, delta);
 }
 
 
 int64_t
 TrustLineWrapper::getBuyingLiabilities(LedgerStateHeader const& header)
 {
-    return mImpl->getBuyingLiabilities(header);
+    return getImpl()->getBuyingLiabilities(header);
 }
 
 int64_t
 TrustLineWrapper::getSellingLiabilities(LedgerStateHeader const& header)
 {
-    return mImpl->getSellingLiabilities(header);
+    return getImpl()->getSellingLiabilities(header);
 }
 
 int64_t
 TrustLineWrapper::addBuyingLiabilities(LedgerStateHeader const& header,
                                        int64_t delta)
 {
-    return mImpl->addBuyingLiabilities(header, delta);
+    return getImpl()->addBuyingLiabilities(header, delta);
 }
 
 int64_t
 TrustLineWrapper::addSellingLiabilities(LedgerStateHeader const& header,
                                         int64_t delta)
 {
-    return mImpl->addSellingLiabilities(header, delta);
+    return getImpl()->addSellingLiabilities(header, delta);
 }
 
 bool
 TrustLineWrapper::isAuthorized() const
 {
-    return mImpl->isAuthorized();
+    return getImpl()->isAuthorized();
 }
 
 int64_t
 TrustLineWrapper::getAvailableBalance(LedgerStateHeader const& header) const
 {
-    return mImpl->getAvailableBalance(header);
+    return getImpl()->getAvailableBalance(header);
 }
 
 int64_t
 TrustLineWrapper::getMaxAmountReceive(LedgerStateHeader const& header) const
 {
-    return mImpl->getMaxAmountReceive(header);
+    return getImpl()->getMaxAmountReceive(header);
 }
 
 void
 TrustLineWrapper::deactivate()
 {
     mImpl.reset();
+}
+
+std::unique_ptr<TrustLineWrapper::AbstractImpl> const&
+TrustLineWrapper::getImpl() const
+{
+    if (!(*this))
+    {
+        throw std::runtime_error("TrustLineWrapper not active");
+    }
+    return mImpl;
 }
 
 // Implementation of TrustLineWrapper::NonIssuerImpl --------------------------
@@ -430,25 +440,35 @@ ConstTrustLineWrapper::operator bool() const
 int64_t
 ConstTrustLineWrapper::getBalance() const
 {
-    return mImpl->getBalance();
+    return getImpl()->getBalance();
 }
 
 bool
 ConstTrustLineWrapper::isAuthorized() const
 {
-    return mImpl->isAuthorized();
+    return getImpl()->isAuthorized();
 }
 
 int64_t
 ConstTrustLineWrapper::getAvailableBalance(LedgerStateHeader const& header) const
 {
-    return mImpl->getAvailableBalance(header);
+    return getImpl()->getAvailableBalance(header);
 }
 
 int64_t
 ConstTrustLineWrapper::getMaxAmountReceive(LedgerStateHeader const& header) const
 {
-    return mImpl->getMaxAmountReceive(header);
+    return getImpl()->getMaxAmountReceive(header);
+}
+
+std::unique_ptr<ConstTrustLineWrapper::AbstractImpl> const&
+ConstTrustLineWrapper::getImpl() const
+{
+    if (!(*this))
+    {
+        throw std::runtime_error("ConstTrustLineWrapper not active");
+    }
+    return mImpl;
 }
 
 // Implementation of ConstTrustLineWrapper::NonIssuerImpl ---------------------
