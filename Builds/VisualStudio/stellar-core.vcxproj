@@ -610,6 +610,7 @@ exit /b 0
     <ClInclude Include="..\..\src\ledger\LedgerHeaderUtils.h" />
     <ClInclude Include="..\..\src\ledger\LedgerRange.h" />
     <ClInclude Include="..\..\src\ledger\LedgerState.h" />
+    <ClInclude Include="..\..\src\ledger\LedgerStateImpl.h" />
     <ClInclude Include="..\..\src\ledger\LedgerStateEntry.h" />
     <ClInclude Include="..\..\src\ledger\LedgerStateHeader.h" />
     <ClInclude Include="..\..\src\ledger\LedgerTestUtils.h" />
