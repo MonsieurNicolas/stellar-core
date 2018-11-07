@@ -210,8 +210,14 @@ LedgerState::Impl::commitChild(EntryIterator iter)
             }
         }
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error during commit to LedgerState: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error during commit to LedgerState\n");
         abort();
     }
 
@@ -1199,8 +1205,14 @@ LedgerStateRoot::Impl::commitChild(EntryIterator iter)
         mTransaction->commit();
         mDatabase.clearPreparedStatementCache();
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error during commit to LedgerStateRoot: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error during commit to LedgerStateRoot\n");
         abort();
     }
 
@@ -1346,8 +1358,14 @@ LedgerStateRoot::Impl::getAllOffers()
     {
         offers = loadAllOffers();
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error when getting all offers from LedgerStateRoot: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error when getting all offers from LedgerStateRoot\n");
         abort();
     }
 
@@ -1414,8 +1432,14 @@ LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
             newOfferIter =
                 loadBestOffers(offers, buying, selling, BATCH_SIZE, offers.size());
         }
+        catch (std::exception& e)
+        {
+            std::fprintf(stderr, "fatal error when getting best offer from LedgerStateRoot: %s\n", e.what());
+            abort();
+        }
         catch (...)
         {
+            std::fprintf(stderr, "unknown fatal error when getting best offer from LedgerStateRoot\n");
             abort();
         }
 
@@ -1444,8 +1468,14 @@ LedgerStateRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
     {
         offers = loadOffersByAccountAndAsset(account, asset);
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error when getting offers by account and asset from LedgerStateRoot: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error when getting offers by account and asset from LedgerStateRoot");
         abort();
     }
 
@@ -1482,8 +1512,14 @@ LedgerStateRoot::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     {
         return loadInflationWinners(maxWinners, minVotes);
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error when getting inflation winners from LedgerStateRoot: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error when getting inflation winners from LedgerStateRoot\n");
         abort();
     }
 }
@@ -1524,8 +1560,14 @@ LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
             throw std::runtime_error("Unknown key type");
         }
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error when loading ledger entry from LedgerStateRoot: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error when loading ledger entry from LedgerStateRoot\n");
         abort();
     }
 
@@ -1547,8 +1589,14 @@ LedgerStateRoot::Impl::rollbackChild()
         mTransaction->rollback();
         mTransaction.reset();
     }
+    catch (std::exception& e)
+    {
+        std::fprintf(stderr, "fatal error when rolling back child of LedgerStateRoot: %s\n", e.what());
+        abort();
+    }
     catch (...)
     {
+        std::fprintf(stderr, "unknown fatal error when rolling back child of LedgerStateRoot\n");
         abort();
     }
 
