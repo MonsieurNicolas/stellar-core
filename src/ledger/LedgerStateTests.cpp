@@ -475,10 +475,11 @@ TEST_CASE("LedgerState create", "[ledgerstate]")
         validate(ls1, {{key, {std::make_shared<LedgerEntry const>(le), nullptr}}});
     }
 
-    SECTION("when key exists in parent")
+    SECTION("when key exists in self or parent")
     {
         LedgerState ls1(app->getLedgerStateRoot());
         REQUIRE(ls1.create(le));
+        REQUIRE_THROWS_AS(ls1.create(le), std::runtime_error);
 
         LedgerState ls2(ls1);
         REQUIRE_THROWS_AS(ls2.create(le), std::runtime_error);
