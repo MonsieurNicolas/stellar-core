@@ -5,6 +5,7 @@
 #include "database/Database.h"
 #include "ledger/LedgerState.h"
 #include "util/lrucache.hpp"
+#include <map>
 
 namespace stellar
 {
@@ -39,14 +40,15 @@ class LedgerState::Impl
 {
     class EntryIteratorImpl;
 
-    typedef std::map<LedgerKey, std::shared_ptr<LedgerEntry>> EntryMap;
+    typedef std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry>>
+        EntryMap;
 
     AbstractLedgerStateParent& mParent;
     AbstractLedgerState* mChild;
     std::unique_ptr<LedgerHeader> mHeader;
     std::shared_ptr<LedgerStateHeader::Impl> mActiveHeader;
     EntryMap mEntry;
-    std::map<LedgerKey, std::shared_ptr<EntryImplBase>> mActive;
+    std::unordered_map<LedgerKey, std::shared_ptr<EntryImplBase>> mActive;
     bool const mShouldUpdateLastModified;
     bool mIsSealed;
 
@@ -120,7 +122,7 @@ class LedgerState::Impl
     // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified.
-    std::map<LedgerKey, LedgerEntry> getAllOffers();
+    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers();
 
     // getBestOffer has the basic exception safety guarantee. If it throws an
     // exception, then
@@ -132,7 +134,7 @@ class LedgerState::Impl
     //   even cleared
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>& exclude);
+                 std::unordered_set<LedgerKey>& exclude);
 
     // getChanges has the basic exception safety guarantee. If it throws an
     // exception, then
@@ -155,7 +157,7 @@ class LedgerState::Impl
     // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    std::map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset);
 
     // getHeader does not throw
@@ -198,7 +200,7 @@ class LedgerState::Impl
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
     // - the entry cache may be, but is not guaranteed to be, cleared.
-    std::map<AccountID, std::vector<LedgerStateEntry>>
+    std::unordered_map<AccountID, std::vector<LedgerStateEntry>>
     loadAllOffers(LedgerState& self);
 
     // loadBestOffer has the basic exception safety guarantee. If it throws an
@@ -377,7 +379,7 @@ class LedgerStateRoot::Impl
     // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified.
-    std::map<LedgerKey, LedgerEntry> getAllOffers();
+    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers();
 
     // getBestOffer has the basic exception safety guarantee. If it throws an
     // exception, then
@@ -389,13 +391,13 @@ class LedgerStateRoot::Impl
     //   even cleared
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>& exclude);
+                 std::unordered_set<LedgerKey>& exclude);
 
     // getOffersByAccountAndAsset has the basic exception safety guarantee. If
     // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    std::map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset);
 
     // getHeader does not throw

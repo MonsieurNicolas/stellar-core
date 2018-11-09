@@ -8,9 +8,58 @@
 #include "ledger/LedgerStateHeader.h"
 #include "xdr/Stellar-ledger.h"
 #include <functional>
-#include <map>
 #include <memory>
-#include <set>
+#include <unordered_map>
+#include <unordered_set>
+
+template <> class std::hash<stellar::LedgerKey>
+{
+  public:
+    static size_t
+    simpleHash(size_t s, uint8_t const* p, size_t n)
+    {
+        std::string l;
+        size_t r = s;
+        auto last = p + n;
+        for (; p != last; p++)
+        {
+            r ^= static_cast<size_t>(*p);
+            r *= 1099511628211ULL;
+        }
+        return r;
+    }
+    static size_t
+    simpleHash(uint8_t const* p, size_t n)
+    {
+        return simpleHash(14695981039346656037ULL, p, n);
+    }
+
+    size_t
+    operator()(stellar::LedgerKey const& lk) const
+    {
+        size_t res;
+        switch (lk.type())
+        {
+        case stellar::ACCOUNT:
+            res = simpleHash(lk.account().accountID.ed25519().data(), 4);
+            break;
+        case stellar::TRUSTLINE:
+            res = simpleHash(lk.trustLine().accountID.ed25519().data(), 4);
+            res += lk.trustLine().asset.type();
+            break;
+        case stellar::DATA:
+            res = simpleHash(lk.data().accountID.ed25519().data(), 4);
+            res += lk.data().dataName.at(0);
+            break;
+        case stellar::OFFER:
+            res = lk.offer().offerID;
+            break;
+        default:
+            abort();
+        }
+        return res;
+    }
+};
 
 namespace stellar
 {
@@ -47,7 +96,7 @@ struct LedgerStateDelta
         LedgerHeader previous;
     };
 
-    std::map<LedgerKey, EntryDelta> entry;
+    std::unordered_map<LedgerKey, EntryDelta> entry;
     HeaderDelta header;
 };
 
@@ -115,12 +164,13 @@ class AbstractLedgerStateParent
     // - getOffersByAccountAndAsset
     //     Get XDR for every offer owned by the specified account that is either
     //     buying or selling the specified asset.
-    virtual std::map<LedgerKey, LedgerEntry> getAllOffers() = 0;
+    virtual std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() = 0;
     virtual std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>& exclude) = 0;
-    virtual std::map<LedgerKey, LedgerEntry>
-    getOffersByAccountAndAsset(AccountID const& account, Asset const& asset) = 0;
+                 std::unordered_set<LedgerKey>& exclude) = 0;
+    virtual std::unordered_map<LedgerKey, LedgerEntry>
+    getOffersByAccountAndAsset(AccountID const& account,
+                               Asset const& asset) = 0;
 
     // getHeader returns the LedgerHeader stored by AbstractLedgerStateParent.
     // Used to allow the LedgerHeader to propagate to a child.
@@ -238,7 +288,7 @@ class AbstractLedgerState : public AbstractLedgerStateParent
     // All of these functions throw if the AbstractLedgerState is sealed or if
     // the AbstractLedgerState has a child. These functions also throw if any
     // LedgerKey they try to load is already active.
-    virtual std::map<AccountID, std::vector<LedgerStateEntry>>
+    virtual std::unordered_map<AccountID, std::vector<LedgerStateEntry>>
     loadAllOffers() = 0;
     virtual LedgerStateEntry loadBestOffer(Asset const& buying,
                                            Asset const& selling) = 0;
@@ -287,11 +337,11 @@ class LedgerState final : public AbstractLedgerState
 
     void erase(LedgerKey const& key) override;
 
-    std::map<LedgerKey, LedgerEntry> getAllOffers() override;
+    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() override;
 
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>& exclude) override;
+                 std::unordered_set<LedgerKey>& exclude) override;
 
     LedgerEntryChanges getChanges() override;
 
@@ -299,8 +349,9 @@ class LedgerState final : public AbstractLedgerState
 
     LedgerStateDelta getDelta() override;
 
-    std::map<LedgerKey, LedgerEntry>
-    getOffersByAccountAndAsset(AccountID const& account, Asset const& asset) override;
+    std::unordered_map<LedgerKey, LedgerEntry>
+    getOffersByAccountAndAsset(AccountID const& account,
+                               Asset const& asset) override;
 
     LedgerHeader const& getHeader() const override;
 
@@ -317,7 +368,7 @@ class LedgerState final : public AbstractLedgerState
 
     LedgerStateEntry load(LedgerKey const& key) override;
 
-    std::map<AccountID, std::vector<LedgerStateEntry>>
+    std::unordered_map<AccountID, std::vector<LedgerStateEntry>>
     loadAllOffers() override;
 
     LedgerStateEntry loadBestOffer(Asset const& buying,
@@ -363,14 +414,15 @@ class LedgerStateRoot : public AbstractLedgerStateParent
     void dropOffers();
     void dropTrustLines();
 
-    std::map<LedgerKey, LedgerEntry> getAllOffers() override;
+    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() override;
 
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
-                 std::set<LedgerKey>& exclude) override;
+                 std::unordered_set<LedgerKey>& exclude) override;
 
-    std::map<LedgerKey, LedgerEntry>
-    getOffersByAccountAndAsset(AccountID const& account, Asset const& asset) override;
+    std::unordered_map<LedgerKey, LedgerEntry>
+    getOffersByAccountAndAsset(AccountID const& account,
+                               Asset const& asset) override;
 
     LedgerHeader const& getHeader() const override;
 

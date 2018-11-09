@@ -46,8 +46,7 @@ EntryIterator::getImpl() const
     return mImpl;
 }
 
-EntryIterator&
-EntryIterator::operator++()
+EntryIterator& EntryIterator::operator++()
 {
     getImpl()->advance();
     return *this;
@@ -95,7 +94,8 @@ LedgerState::LedgerState(LedgerState& parent, bool shouldUpdateLastModified)
 
 LedgerState::Impl::Impl(LedgerState& self, AbstractLedgerStateParent& parent,
                         bool shouldUpdateLastModified)
-    : mParent(parent), mChild(nullptr)
+    : mParent(parent)
+    , mChild(nullptr)
     , mHeader(std::make_unique<LedgerHeader>(mParent.getHeader()))
     , mShouldUpdateLastModified(shouldUpdateLastModified)
     , mIsSealed(false)
@@ -135,7 +135,7 @@ LedgerState::Impl::addChild(AbstractLedgerState& child)
 
     mChild = &child;
 
-    // std::set<...>::clear is noexcept
+    // std::unordered_map<...>::clear is noexcept
     mActive.clear();
 
     // std::shared_ptr<...>::reset is noexcept
@@ -170,12 +170,11 @@ LedgerState::commit()
 void
 LedgerState::Impl::commit()
 {
-    maybeUpdateLastModifiedThenInvokeThenSeal(
-        [&] (EntryMap const& entries) {
-            // getEntryIterator has the strong exception safety guarantee
-            // commitChild has the strong exception safety guarantee
-            mParent.commitChild(getEntryIterator(entries));
-        });
+    maybeUpdateLastModifiedThenInvokeThenSeal([&](EntryMap const& entries) {
+        // getEntryIterator has the strong exception safety guarantee
+        // commitChild has the strong exception safety guarantee
+        mParent.commitChild(getEntryIterator(entries));
+    });
 }
 
 void
@@ -212,12 +211,14 @@ LedgerState::Impl::commitChild(EntryIterator iter)
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error during commit to LedgerState: %s\n", e.what());
+        std::fprintf(stderr, "fatal error during commit to LedgerState: %s\n",
+                     e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error during commit to LedgerState\n");
+        std::fprintf(stderr,
+                     "unknown fatal error during commit to LedgerState\n");
         abort();
     }
 
@@ -343,13 +344,13 @@ LedgerState::Impl::erase(LedgerKey const& key)
     }
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerState::getAllOffers()
 {
     return getImpl()->getAllOffers();
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerState::Impl::getAllOffers()
 {
     auto offers = mParent.getAllOffers();
@@ -373,14 +374,14 @@ LedgerState::Impl::getAllOffers()
 
 std::shared_ptr<LedgerEntry const>
 LedgerState::getBestOffer(Asset const& buying, Asset const& selling,
-                          std::set<LedgerKey>& exclude)
+                          std::unordered_set<LedgerKey>& exclude)
 {
     return getImpl()->getBestOffer(buying, selling, exclude);
 }
 
 std::shared_ptr<LedgerEntry const>
 LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
-                                std::set<LedgerKey>& exclude)
+                                std::unordered_set<LedgerKey>& exclude)
 {
     auto end = mEntry.cend();
     auto bestOfferIter = end;
@@ -420,8 +421,8 @@ LedgerState::Impl::getBestOffer(Asset const& buying, Asset const& selling,
     auto parentBestOffer = mParent.getBestOffer(buying, selling, exclude);
     if (bestOffer && parentBestOffer)
     {
-        return isBetterOffer(*bestOffer, *parentBestOffer)
-            ? bestOffer : parentBestOffer;
+        return isBetterOffer(*bestOffer, *parentBestOffer) ? bestOffer
+                                                           : parentBestOffer;
     }
     else
     {
@@ -439,41 +440,40 @@ LedgerEntryChanges
 LedgerState::Impl::getChanges()
 {
     LedgerEntryChanges changes;
-    maybeUpdateLastModifiedThenInvokeThenSeal(
-        [&] (EntryMap const& entries) {
-            for (auto const& kv : entries)
+    maybeUpdateLastModifiedThenInvokeThenSeal([&](EntryMap const& entries) {
+        for (auto const& kv : entries)
+        {
+            auto const& key = kv.first;
+            auto const& entry = kv.second;
+
+            auto previous = mParent.getNewestVersion(key);
+            if (previous)
             {
-                auto const& key = kv.first;
-                auto const& entry = kv.second;
+                changes.emplace_back(LEDGER_ENTRY_STATE);
+                changes.back().state() = *previous;
 
-                auto previous = mParent.getNewestVersion(key);
-                if (previous)
+                if (entry)
                 {
-                    changes.emplace_back(LEDGER_ENTRY_STATE);
-                    changes.back().state() = *previous;
-
-                    if (entry)
-                    {
-                        changes.emplace_back(LEDGER_ENTRY_UPDATED);
-                        changes.back().updated() = *entry;
-                    }
-                    else
-                    {
-                        changes.emplace_back(LEDGER_ENTRY_REMOVED);
-                        changes.back().removed() = key;
-                    }
+                    changes.emplace_back(LEDGER_ENTRY_UPDATED);
+                    changes.back().updated() = *entry;
                 }
                 else
                 {
-                    // If !entry and !previous.entry then the entry was created and
-                    // erased in this LedgerState, in which case it should not still be
-                    // in this LedgerState
-                    assert(entry);
-                    changes.emplace_back(LEDGER_ENTRY_CREATED);
-                    changes.back().created() = *entry;
+                    changes.emplace_back(LEDGER_ENTRY_REMOVED);
+                    changes.back().removed() = key;
                 }
             }
-        });
+            else
+            {
+                // If !entry and !previous.entry then the entry was created and
+                // erased in this LedgerState, in which case it should not still
+                // be in this LedgerState
+                assert(entry);
+                changes.emplace_back(LEDGER_ENTRY_CREATED);
+                changes.back().created() = *entry;
+            }
+        }
+    });
     return changes;
 }
 
@@ -487,18 +487,17 @@ std::vector<LedgerKey>
 LedgerState::Impl::getDeadEntries()
 {
     std::vector<LedgerKey> res;
-    maybeUpdateLastModifiedThenInvokeThenSeal(
-        [&res] (EntryMap const& entries) {
-            for (auto const& kv : entries)
+    maybeUpdateLastModifiedThenInvokeThenSeal([&res](EntryMap const& entries) {
+        for (auto const& kv : entries)
+        {
+            auto const& key = kv.first;
+            auto const& entry = kv.second;
+            if (!entry)
             {
-                auto const& key = kv.first;
-                auto const& entry = kv.second;
-                if (!entry)
-                {
-                    res.push_back(key);
-                }
+                res.push_back(key);
             }
-        });
+        }
+    });
     return res;
 }
 
@@ -512,20 +511,19 @@ LedgerStateDelta
 LedgerState::Impl::getDelta()
 {
     LedgerStateDelta delta;
-    maybeUpdateLastModifiedThenInvokeThenSeal(
-        [&] (EntryMap const& entries) {
-            for (auto const& kv : entries)
-            {
-                auto const& key = kv.first;
-                auto previous = mParent.getNewestVersion(key);
+    maybeUpdateLastModifiedThenInvokeThenSeal([&](EntryMap const& entries) {
+        for (auto const& kv : entries)
+        {
+            auto const& key = kv.first;
+            auto previous = mParent.getNewestVersion(key);
 
-                // Deep copy is not required here because getDelta causes LedgerState
-                // to enter the sealed state, meaning subsequent modifications are
-                // impossible.
-                delta.entry[key] = {kv.second, previous};
-            }
-            delta.header = {*mHeader, mParent.getHeader()};
-        });
+            // Deep copy is not required here because getDelta causes
+            // LedgerState to enter the sealed state, meaning subsequent
+            // modifications are impossible.
+            delta.entry[key] = {kv.second, previous};
+        }
+        delta.header = {*mHeader, mParent.getHeader()};
+    });
     return delta;
 }
 
@@ -616,8 +614,8 @@ LedgerState::Impl::getTotalVotes(
 
 std::vector<InflationWinner>
 LedgerState::Impl::enumerateInflationWinners(
-    std::map<AccountID, int64_t> const& totalVotes,
-    size_t maxWinners, int64_t minVotes) const
+    std::map<AccountID, int64_t> const& totalVotes, size_t maxWinners,
+    int64_t minVotes) const
 {
     std::vector<InflationWinner> winners;
     for (auto const& total : totalVotes)
@@ -632,14 +630,14 @@ LedgerState::Impl::enumerateInflationWinners(
 
     // Sort the new winners and remove the excess
     std::sort(winners.begin(), winners.end(),
-        [] (auto const& lhs, auto const& rhs) {
-            if (lhs.votes == rhs.votes)
-            {
-                return KeyUtils::toStrKey(lhs.accountID) >
-                       KeyUtils::toStrKey(rhs.accountID);
-            }
-            return lhs.votes > rhs.votes;
-        });
+              [](auto const& lhs, auto const& rhs) {
+                  if (lhs.votes == rhs.votes)
+                  {
+                      return KeyUtils::toStrKey(lhs.accountID) >
+                             KeyUtils::toStrKey(rhs.accountID);
+                  }
+                  return lhs.votes > rhs.votes;
+              });
     if (winners.size() > maxWinners)
     {
         winners.resize(maxWinners);
@@ -657,9 +655,7 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     // have had their vote totals change
     size_t numChanged =
         std::count_if(deltaVotes.cbegin(), deltaVotes.cend(),
-            [] (auto const& val) {
-                return val.second != 0;
-            });
+                      [](auto const& val) { return val.second != 0; });
     // Equivalent to maxWinners + numChanged > MAX
     if (std::numeric_limits<size_t>::max() - numChanged < maxWinners)
     {
@@ -671,9 +667,10 @@ LedgerState::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     // change in their vote totals
     int64_t maxIncrease =
         std::max_element(deltaVotes.cbegin(), deltaVotes.cend(),
-            [] (auto const& lhs, auto const& rhs) {
-               return lhs.second < rhs.second;
-            })->second;
+                         [](auto const& lhs, auto const& rhs) {
+                             return lhs.second < rhs.second;
+                         })
+            ->second;
     maxIncrease = std::max(int64_t(0), maxIncrease);
     int64_t newMinVotes =
         (minVotes > maxIncrease) ? (minVotes - maxIncrease) : 0;
@@ -714,17 +711,16 @@ std::vector<LedgerEntry>
 LedgerState::Impl::getLiveEntries()
 {
     std::vector<LedgerEntry> res;
-    maybeUpdateLastModifiedThenInvokeThenSeal(
-        [&res] (EntryMap const& entries) {
-            for (auto const& kv : entries)
+    maybeUpdateLastModifiedThenInvokeThenSeal([&res](EntryMap const& entries) {
+        for (auto const& kv : entries)
+        {
+            auto const& entry = kv.second;
+            if (entry)
             {
-                auto const& entry = kv.second;
-                if (entry)
-                {
-                    res.push_back(*entry);
-                }
+                res.push_back(*entry);
             }
-        });
+        }
+    });
     return res;
 }
 
@@ -745,14 +741,14 @@ LedgerState::Impl::getNewestVersion(LedgerKey const& key) const
     return mParent.getNewestVersion(key);
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerState::getOffersByAccountAndAsset(AccountID const& account,
                                         Asset const& asset)
 {
     return getImpl()->getOffersByAccountAndAsset(account, asset);
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerState::Impl::getOffersByAccountAndAsset(AccountID const& account,
                                               Asset const& asset)
 {
@@ -822,13 +818,13 @@ LedgerState::Impl::load(LedgerState& self, LedgerKey const& key)
     return lse;
 }
 
-std::map<AccountID, std::vector<LedgerStateEntry>>
+std::unordered_map<AccountID, std::vector<LedgerStateEntry>>
 LedgerState::loadAllOffers()
 {
     return getImpl()->loadAllOffers(*this);
 }
 
-std::map<AccountID, std::vector<LedgerStateEntry>>
+std::unordered_map<AccountID, std::vector<LedgerStateEntry>>
 LedgerState::Impl::loadAllOffers(LedgerState& self)
 {
     throwIfSealed();
@@ -838,7 +834,8 @@ LedgerState::Impl::loadAllOffers(LedgerState& self)
     auto offers = getAllOffers();
     try
     {
-        std::map<AccountID, std::vector<LedgerStateEntry>> offersByAccount;
+        std::unordered_map<AccountID, std::vector<LedgerStateEntry>>
+            offersByAccount;
         for (auto const& kv : offers)
         {
             auto const& key = kv.first;
@@ -870,7 +867,7 @@ LedgerState::Impl::loadBestOffer(LedgerState& self, Asset const& buying,
     throwIfSealed();
     throwIfChild();
 
-    std::set<LedgerKey> exclude;
+    std::unordered_set<LedgerKey> exclude(4096, std::hash<LedgerKey>());
     auto le = getBestOffer(buying, selling, exclude);
     return le ? load(self, LedgerEntryKey(*le)) : LedgerStateEntry();
 }
@@ -1008,8 +1005,8 @@ LedgerState::unsealHeader(std::function<void(LedgerHeader&)> f)
 }
 
 void
-LedgerState::Impl::unsealHeader(
-    LedgerState& self, std::function<void(LedgerHeader&)> f)
+LedgerState::Impl::unsealHeader(LedgerState& self,
+                                std::function<void(LedgerHeader&)> f)
 {
     if (!mIsSealed)
     {
@@ -1062,7 +1059,7 @@ LedgerState::Impl::maybeUpdateLastModifiedThenInvokeThenSeal(
         // std::less<LedgerKey>, so this should not throw when swapped)
         mEntry.swap(entries);
 
-        // std::set<...>::clear does not throw
+        // std::unordered_set<...>::clear does not throw
         // std::shared_ptr<...>::reset does not throw
         mActive.clear();
         mActiveHeader.reset();
@@ -1076,7 +1073,7 @@ LedgerState::Impl::maybeUpdateLastModifiedThenInvokeThenSeal(
 
 // Implementation of LedgerState::Impl::EntryIteratorImpl ---------------------
 LedgerState::Impl::EntryIteratorImpl::EntryIteratorImpl(
-        IteratorType const& begin, IteratorType const& end)
+    IteratorType const& begin, IteratorType const& end)
     : mIter(begin), mEnd(end)
 {
 }
@@ -1120,7 +1117,8 @@ LedgerStateRoot::LedgerStateRoot(Database& db, size_t entryCacheSize,
 
 LedgerStateRoot::Impl::Impl(Database& db, size_t entryCacheSize,
                             size_t bestOfferCacheSize)
-    : mDatabase(db), mHeader(std::make_unique<LedgerHeader>())
+    : mDatabase(db)
+    , mHeader(std::make_unique<LedgerHeader>())
     , mEntryCache(entryCacheSize)
     , mBestOffersCache(bestOfferCacheSize)
     , mChild(nullptr)
@@ -1207,12 +1205,15 @@ LedgerStateRoot::Impl::commitChild(EntryIterator iter)
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error during commit to LedgerStateRoot: %s\n", e.what());
+        std::fprintf(stderr,
+                     "fatal error during commit to LedgerStateRoot: %s\n",
+                     e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error during commit to LedgerStateRoot\n");
+        std::fprintf(stderr,
+                     "unknown fatal error during commit to LedgerStateRoot\n");
         abort();
     }
 
@@ -1279,9 +1280,9 @@ LedgerStateRoot::Impl::countObjects(LedgerEntryType let,
     using namespace soci;
     throwIfChild();
 
-    std::string query =
-        "SELECT COUNT(*) FROM " + tableFromLedgerEntryType(let) +
-        " WHERE lastmodified >= :v1 AND lastmodified <= :v2;";
+    std::string query = "SELECT COUNT(*) FROM " +
+                        tableFromLedgerEntryType(let) +
+                        " WHERE lastmodified >= :v1 AND lastmodified <= :v2;";
     uint64_t count = 0;
     mDatabase.getSession() << query, into(count), use(ledgers.first()),
         use(ledgers.last());
@@ -1289,15 +1290,14 @@ LedgerStateRoot::Impl::countObjects(LedgerEntryType let,
 }
 
 void
-LedgerStateRoot::deleteObjectsModifiedOnOrAfterLedger(
-        uint32_t ledger) const
+LedgerStateRoot::deleteObjectsModifiedOnOrAfterLedger(uint32_t ledger) const
 {
     return mImpl->deleteObjectsModifiedOnOrAfterLedger(ledger);
 }
 
 void
 LedgerStateRoot::Impl::deleteObjectsModifiedOnOrAfterLedger(
-        uint32_t ledger) const
+    uint32_t ledger) const
 {
     using namespace soci;
     throwIfChild();
@@ -1313,9 +1313,8 @@ LedgerStateRoot::Impl::deleteObjectsModifiedOnOrAfterLedger(
 
     for (auto let : {ACCOUNT, DATA, TRUSTLINE, OFFER})
     {
-        std::string query =
-            "DELETE FROM " + tableFromLedgerEntryType(let) +
-            " WHERE lastmodified >= :v1";
+        std::string query = "DELETE FROM " + tableFromLedgerEntryType(let) +
+                            " WHERE lastmodified >= :v1";
         mDatabase.getSession() << query, use(ledger);
     }
 }
@@ -1344,13 +1343,13 @@ LedgerStateRoot::dropTrustLines()
     mImpl->dropTrustLines();
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerStateRoot::getAllOffers()
 {
     return mImpl->getAllOffers();
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerStateRoot::Impl::getAllOffers()
 {
     std::vector<LedgerEntry> offers;
@@ -1360,16 +1359,20 @@ LedgerStateRoot::Impl::getAllOffers()
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error when getting all offers from LedgerStateRoot: %s\n", e.what());
+        std::fprintf(
+            stderr,
+            "fatal error when getting all offers from LedgerStateRoot: %s\n",
+            e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error when getting all offers from LedgerStateRoot\n");
+        std::fprintf(stderr, "unknown fatal error when getting all offers from "
+                             "LedgerStateRoot\n");
         abort();
     }
 
-    std::map<LedgerKey, LedgerEntry> offersByKey;
+    std::unordered_map<LedgerKey, LedgerEntry> offersByKey;
     for (auto const& offer : offers)
     {
         offersByKey.emplace(LedgerEntryKey(offer), offer);
@@ -1379,7 +1382,7 @@ LedgerStateRoot::Impl::getAllOffers()
 
 std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::getBestOffer(Asset const& buying, Asset const& selling,
-                              std::set<LedgerKey>& exclude)
+                              std::unordered_set<LedgerKey>& exclude)
 {
     return mImpl->getBestOffer(buying, selling, exclude);
 }
@@ -1387,9 +1390,9 @@ LedgerStateRoot::getBestOffer(Asset const& buying, Asset const& selling,
 static std::shared_ptr<LedgerEntry const>
 findIncludedOffer(std::list<LedgerEntry>::const_iterator iter,
                   std::list<LedgerEntry>::const_iterator const& end,
-                  std::set<LedgerKey> const& exclude)
+                  std::unordered_set<LedgerKey> const& exclude)
 {
-    for ( ; iter != end; ++iter)
+    for (; iter != end; ++iter)
     {
         auto key = LedgerEntryKey(*iter);
         if (exclude.find(key) == exclude.end())
@@ -1402,7 +1405,7 @@ findIncludedOffer(std::list<LedgerEntry>::const_iterator iter,
 
 std::shared_ptr<LedgerEntry const>
 LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
-                                    std::set<LedgerKey>& exclude)
+                                    std::unordered_set<LedgerKey>& exclude)
 {
     // Note: Elements of mBestOffersCache are properly sorted lists of the best
     // offers for a certain asset pair. This function maintaints the invariant
@@ -1418,7 +1421,8 @@ LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
 
     // Have to check again in case the max cache size is 0 or the put throws
     auto& cached = mBestOffersCache.exists(cacheKey)
-        ? getFromBestOffersCache(cacheKey) : emptyCacheEntry;
+                       ? getFromBestOffersCache(cacheKey)
+                       : emptyCacheEntry;
     auto& offers = cached.bestOffers;
 
     auto res = findIncludedOffer(offers.cbegin(), offers.cend(), exclude);
@@ -1429,17 +1433,21 @@ LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
         std::list<LedgerEntry>::const_iterator newOfferIter;
         try
         {
-            newOfferIter =
-                loadBestOffers(offers, buying, selling, BATCH_SIZE, offers.size());
+            newOfferIter = loadBestOffers(offers, buying, selling, BATCH_SIZE,
+                                          offers.size());
         }
         catch (std::exception& e)
         {
-            std::fprintf(stderr, "fatal error when getting best offer from LedgerStateRoot: %s\n", e.what());
+            std::fprintf(stderr,
+                         "fatal error when getting best offer from "
+                         "LedgerStateRoot: %s\n",
+                         e.what());
             abort();
         }
         catch (...)
         {
-            std::fprintf(stderr, "unknown fatal error when getting best offer from LedgerStateRoot\n");
+            std::fprintf(stderr, "unknown fatal error when getting best offer "
+                                 "from LedgerStateRoot\n");
             abort();
         }
 
@@ -1452,14 +1460,14 @@ LedgerStateRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
     return res;
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerStateRoot::getOffersByAccountAndAsset(AccountID const& account,
                                             Asset const& asset)
 {
     return mImpl->getOffersByAccountAndAsset(account, asset);
 }
 
-std::map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry>
 LedgerStateRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
                                                   Asset const& asset)
 {
@@ -1470,16 +1478,20 @@ LedgerStateRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error when getting offers by account and asset from LedgerStateRoot: %s\n", e.what());
+        std::fprintf(stderr,
+                     "fatal error when getting offers by account and asset "
+                     "from LedgerStateRoot: %s\n",
+                     e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error when getting offers by account and asset from LedgerStateRoot");
+        std::fprintf(stderr, "unknown fatal error when getting offers by "
+                             "account and asset from LedgerStateRoot");
         abort();
     }
 
-    std::map<LedgerKey, LedgerEntry> res;
+    std::unordered_map<LedgerKey, LedgerEntry> res;
     for (auto const& offer : offers)
     {
         res.emplace(LedgerEntryKey(offer), offer);
@@ -1514,12 +1526,16 @@ LedgerStateRoot::Impl::getInflationWinners(size_t maxWinners, int64_t minVotes)
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error when getting inflation winners from LedgerStateRoot: %s\n", e.what());
+        std::fprintf(stderr,
+                     "fatal error when getting inflation winners from "
+                     "LedgerStateRoot: %s\n",
+                     e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error when getting inflation winners from LedgerStateRoot\n");
+        std::fprintf(stderr, "unknown fatal error when getting inflation "
+                             "winners from LedgerStateRoot\n");
         abort();
     }
 }
@@ -1562,12 +1578,16 @@ LedgerStateRoot::Impl::getNewestVersion(LedgerKey const& key) const
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error when loading ledger entry from LedgerStateRoot: %s\n", e.what());
+        std::fprintf(
+            stderr,
+            "fatal error when loading ledger entry from LedgerStateRoot: %s\n",
+            e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error when loading ledger entry from LedgerStateRoot\n");
+        std::fprintf(stderr, "unknown fatal error when loading ledger entry "
+                             "from LedgerStateRoot\n");
         abort();
     }
 
@@ -1591,12 +1611,17 @@ LedgerStateRoot::Impl::rollbackChild()
     }
     catch (std::exception& e)
     {
-        std::fprintf(stderr, "fatal error when rolling back child of LedgerStateRoot: %s\n", e.what());
+        std::fprintf(
+            stderr,
+            "fatal error when rolling back child of LedgerStateRoot: %s\n",
+            e.what());
         abort();
     }
     catch (...)
     {
-        std::fprintf(stderr, "unknown fatal error when rolling back child of LedgerStateRoot\n");
+        std::fprintf(
+            stderr,
+            "unknown fatal error when rolling back child of LedgerStateRoot\n");
         abort();
     }
 
@@ -1700,8 +1725,8 @@ LedgerStateRoot::Impl::EntryCacheKey
 LedgerStateRoot::Impl::getBestOffersCacheKey(Asset const& buying,
                                              Asset const& selling) const
 {
-    return binToHex(xdr::xdr_to_opaque(buying))
-           + binToHex(xdr::xdr_to_opaque(selling));
+    return binToHex(xdr::xdr_to_opaque(buying)) +
+           binToHex(xdr::xdr_to_opaque(selling));
 }
 
 LedgerStateRoot::Impl::BestOffersCacheEntry&
