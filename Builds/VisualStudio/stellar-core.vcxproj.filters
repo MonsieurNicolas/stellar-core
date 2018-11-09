@@ -1505,6 +1505,9 @@
     <ClInclude Include="..\..\src\transactions\TransactionUtils.h">
       <Filter>transactions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\ledger\LedgerStateImpl.h">
+      <Filter>ledger</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\AUTHORS" />
