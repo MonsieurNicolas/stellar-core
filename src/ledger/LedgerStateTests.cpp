@@ -595,7 +595,7 @@ static void applyLedgerStateUpdates(
 
 static void testInflationWinners(
     AbstractLedgerStateParent& lsParent, size_t maxWinners, int64_t minBalance,
-    std::vector<std::tuple<AccountID, uint64_t>> const& expected,
+    std::vector<std::tuple<AccountID, int64_t>> const& expected,
     std::vector<std::map<AccountID, std::pair<AccountID, int64_t>>>::const_iterator begin,
     std::vector<std::map<AccountID, std::pair<AccountID, int64_t>>>::const_iterator const& end)
 {
@@ -626,7 +626,7 @@ static void testInflationWinners(
 
 static void testInflationWinners(
     size_t maxWinners, int64_t minBalance,
-    std::vector<std::tuple<AccountID, uint64_t>> const& expected,
+    std::vector<std::tuple<AccountID, int64_t>> const& expected,
     std::vector<std::map<AccountID, std::pair<AccountID, int64_t>>> const& updates)
 {
     REQUIRE(!updates.empty());
@@ -682,7 +682,7 @@ TEST_CASE("LedgerState queryInflationWinners", "[ledgerstate]")
     auto a3 = LedgerTestUtils::generateValidAccountEntry().accountID;
     auto a4 = LedgerTestUtils::generateValidAccountEntry().accountID;
 
-    auto inflationSort = [] (std::vector<std::tuple<AccountID, uint64_t>> winners) {
+    auto inflationSort = [] (std::vector<std::tuple<AccountID, int64_t>> winners) {
         std::sort(winners.begin(), winners.end(),
             [] (auto const& lhs, auto const& rhs) {
                 if (std::get<1>(lhs) == std::get<1>(rhs))

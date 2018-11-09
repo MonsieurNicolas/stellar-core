@@ -987,7 +987,7 @@ LedgerManagerImpl::applyTransactions(std::vector<TransactionFramePtr>& txs,
                 << mApp.getConfig().toShortString(tx->getSourceID()) << ")";
             tx->apply(mApp, ls, tm.v1());
         }
-        catch (InvariantDoesNotHold& e)
+        catch (InvariantDoesNotHold&)
         {
             throw;
         }
