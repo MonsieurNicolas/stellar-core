@@ -64,8 +64,9 @@ class CommandLine
 
     explicit CommandLine(std::vector<Command> const& commands);
 
-    optional<Command> selectCommand(int argc, char* const* argv);
-    int executeCommand(Command const& command, int argc, char* const* argv);
+    typedef std::pair < Command, int> CommandIndex;
+    optional<CommandIndex> selectCommand(int argc, char* const* argv);
+    int executeCommand(CommandIndex const& command, int argc, char* const* argv);
     void writeToStream(std::string const& exeName, std::ostream& os) const;
 
   private:
@@ -323,33 +324,34 @@ CommandLine::CommandLine(std::vector<Command> const& commands)
         [](Command const& x, Command const& y) { return x.name() < y.name(); });
 }
 
-optional<CommandLine::Command>
+optional<std::pair<CommandLine::Command, int>>
 CommandLine::selectCommand(int argc, char* const* argv)
 {
-    if (argc < 2)
+    if (argc >= 2)
     {
-        return nullopt<Command>();
+        for (int i = 1; i < argc; i++)
+        {
+            auto command = std::find_if(
+                std::begin(mCommands), std::end(mCommands),
+                [&](Command const& command) { return command.name() == argv[i]; });
+            if (command != mCommands.end())
+            {
+                return make_optional<std::pair<Command, int>>(std::make_pair(*command, i));
+            }
+        }
     }
-
-    auto command = std::find_if(
-        std::begin(mCommands), std::end(mCommands),
-        [&](Command const& command) { return command.name() == argv[1]; });
-    if (command == std::end(mCommands))
-    {
-        return nullopt<Command>();
-    }
-
-    return make_optional<Command>(*command);
+    return nullopt<std::pair<Command,int>>();
 }
 
 int
-CommandLine::executeCommand(Command const& command, int argc, char* const* argv)
+CommandLine::executeCommand(CommandIndex const& comIndex, int argc, char* const* argv)
 {
     auto args = CommandLineArgs{argv[0],
-                                fmt::format("{0} {1}", argv[0], command.name()),
-                                command.description(),
-                                {argv + 2, argv + argc}};
-    return command.run(args);
+                                fmt::format("{0} {1}", argv[0], comIndex.first.name()),
+                                comIndex.first.description(),
+    {argv + 1, argv + comIndex.second},
+    {argv + comIndex.second, argv + argc} };
+    return comIndex.first.run(args);
 }
 
 void
@@ -384,6 +386,24 @@ int
 runCatchup(CommandLineArgs const& args)
 {
     CommandLine::ConfigOption configOption;
+    if (!args.mCommonArgs.empty())
+    {
+        auto parser = configurationParser(configOption);
+        auto errorMessage =
+            parser
+            .parse(args.mCommandName,
+                clara::detail::TokenStream{ std::begin(args.mCommonArgs),
+                                           std::end(args.mCommonArgs) })
+            .errorMessage();
+        if (!errorMessage.empty())
+        {
+            writeWithTextFlow(std::cerr, errorMessage);
+            writeWithTextFlow(std::cerr, args.mCommandDescription);
+            parser.writeToStream(std::cerr);
+            return 1;
+        }
+    }
+
     std::string catchupString;
     std::string outputFile;
 
@@ -769,7 +789,7 @@ handleCommandLine(int argc, char* const* argv)
         return nullopt<int>();
     }
 
-    if (command->name() == "run")
+    if (command->first.name() == "run")
     {
         // run outside of catch block so that we properly capture crashes
         return make_optional<int>(

@@ -18,6 +18,7 @@ struct CommandLineArgs
     std::string mExeName;
     std::string mCommandName;
     std::string mCommandDescription;
+    std::vector<std::string> mCommonArgs;
     std::vector<std::string> mArgs;
 };
 
