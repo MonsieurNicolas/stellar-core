@@ -7,6 +7,30 @@
 namespace stellar
 {
 
+enum AccountRefIDType
+{
+    // maps to AccountID
+    ACCOUNT_REF_ID_TYPE_PUB_ED25519 = 1,
+    ACCOUNT_REF_ID_TYPE_HASH = 2,
+
+    // extension
+    ACCOUNT_REF_ID_TYPE_HASH_DET_ACCOUNT = 1000,
+    ACCOUNT_REF_ID_TYPE_NEWEST_DET_ACCOUNT = 1001,
+    ACCOUNT_REF_ID_TYPE_REF_NEW_DET_ACCOUNT = 1002,
+};
+
+union AccountRefID switch (AccountRefIDType type)
+{
+case ACCOUNT_REF_ID_TYPE_ED25519:
+    uint256 ed25519;
+case ACCOUNT_REF_ID_TYPE_HASH_DET_ACCOUNT:
+    uint256 ed25519;
+case ACCOUNT_REF_ID_TYPE_NEWEST_DET_ACCOUNT:
+    void;
+case ACCOUNT_REF_ID_TYPE_REF_NEW_DET_ACCOUNT:
+    int which;
+};
+
 struct DecoratedSignature
 {
     SignatureHint hint;  // last 4 bytes of the public key, used as a hint
@@ -41,8 +65,8 @@ Result: CreateAccountResult
 
 struct CreateAccountOp
 {
-    AccountID destination; // account to create
-    int64 startingBalance; // amount they end up with
+    AccountRefID destination; // account to create
+    int64 startingBalance;    // amount they end up with
 };
 
 /* Payment
@@ -55,9 +79,9 @@ struct CreateAccountOp
 */
 struct PaymentOp
 {
-    AccountID destination; // recipient of the payment
-    Asset asset;           // what they end up with
-    int64 amount;          // amount they end up with
+    AccountRefID destination; // recipient of the payment
+    Asset asset;              // what they end up with
+    int64 amount;             // amount they end up with
 };
 
 /* PathPayment
@@ -78,9 +102,9 @@ struct PathPaymentOp
                      // send (excluding fees).
                      // The operation will fail if can't be met
 
-    AccountID destination; // recipient of the payment
-    Asset destAsset;       // what they end up with
-    int64 destAmount;      // amount they end up with
+    AccountRefID destination; // recipient of the payment
+    Asset destAsset;          // what they end up with
+    int64 destAmount;         // amount they end up with
 
     Asset path<5>; // additional hops it must go through to get there
 };
@@ -130,7 +154,7 @@ struct CreatePassiveOfferOp
 
 struct SetOptionsOp
 {
-    AccountID* inflationDest; // sets the inflation destination
+    AccountRefID* inflationDest; // sets the inflation destination
 
     uint32* clearFlags; // which flags to clear
     uint32* setFlags;   // which flags to set
@@ -174,7 +198,7 @@ struct ChangeTrustOp
 */
 struct AllowTrustOp
 {
-    AccountID trustor;
+    AccountRefID trustor;
     union switch (AssetType type)
     {
     // ASSET_TYPE_NATIVE is not allowed
@@ -278,7 +302,7 @@ struct Operation
     case ALLOW_TRUST:
         AllowTrustOp allowTrustOp;
     case ACCOUNT_MERGE:
-        AccountID destination;
+        AccountRefID destination;
     case INFLATION:
         void;
     case MANAGE_DATA:
