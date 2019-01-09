@@ -7,12 +7,27 @@
 namespace stellar
 {
 
-typedef PublicKey AccountID;
 typedef opaque Thresholds[4];
 typedef string string32<32>;
 typedef string string64<64>;
 typedef int64 SequenceNumber;
 typedef opaque DataValue<64>;
+
+enum AccountIDType
+{
+    // matches PublicKey types
+    ACCOUNT_ID_TYPE_PUB_ED25519 = 0,
+    // extensions
+    ACCOUNT_ID_TYPE_HASH = 100
+};
+
+union AccountIDType switch (AccountIDType type)
+{
+case ACCOUNT_ID_TYPE_PUB_ED25519:
+    uint256 ed25519;
+case ACCOUNT_ID_TYPE_HASH:
+    uint256 hash;
+};
 
 enum AssetType
 {
