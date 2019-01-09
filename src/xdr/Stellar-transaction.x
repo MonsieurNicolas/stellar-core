@@ -26,7 +26,8 @@ enum OperationType
     ACCOUNT_MERGE = 8,
     INFLATION = 9,
     MANAGE_DATA = 10,
-    BUMP_SEQUENCE = 11
+    BUMP_SEQUENCE = 11,
+    CREATE_DETERMINISTIC_ACCOUNT = 12
 };
 
 /* CreateAccount
@@ -236,13 +237,27 @@ struct BumpSequenceOp
     SequenceNumber bumpTo;
 };
 
+/* CreateDeterministicAccount
+    creates an account with an ID determined at execution time
+
+    Threshold: medium
+
+    Result: CreateDeterminisiticAccountResult
+
+*/
+
+struct CreateDeterministicAccountOp
+{
+    int64 startingBalance;
+};
+
 /* An operation is the lowest unit of work that a transaction does */
 struct Operation
 {
     // sourceAccount is the account used to run the operation
     // if not set, the runtime defaults to "sourceAccount" specified at
     // the transaction level
-    AccountID* sourceAccount;
+    AccountRefID* sourceAccount;
 
     union switch (OperationType type)
     {
@@ -270,6 +285,8 @@ struct Operation
         ManageDataOp manageDataOp;
     case BUMP_SEQUENCE:
         BumpSequenceOp bumpSequenceOp;
+    case CREATE_DETERMINISTIC_ACCOUNT:
+        CreateDeterministicAccountOp createDeterministicAccountOp;
     }
     body;
 };
@@ -687,6 +704,29 @@ case BUMP_SEQUENCE_SUCCESS:
 default:
     void;
 };
+
+/******* CreateDeterministicAccount Result ********/
+
+enum CreateDeterministicAccountResultCode
+{
+    // codes considered as "success" for the operation
+    CREATE_DETERMINISTIC_ACCOUNT_SUCCESS = 0,
+    // codes considered as "failure" for the operation
+    CREATE_DETERMINISTIC_ACCOUNT_UNDERFUNDED =
+        -1, // not enough funds in source account
+    CREATE_DETERMINISTIC_ACCOUNT_LOW_RESERVE =
+        -2, // would create an account below the min reserve
+};
+
+union CreateDeterministicAccountResult switch (
+    CreateDeterministicAccountResultCode code)
+{
+case CREATE_DETERMINISTIC_ACCOUNT_SUCCESS:
+    AccountID newAccount;
+default:
+    void;
+};
+
 /* High level Operation Result */
 
 enum OperationResultCode
@@ -727,6 +767,8 @@ case opINNER:
         ManageDataResult manageDataResult;
     case BUMP_SEQUENCE:
         BumpSequenceResult bumpSeqResult;
+    case CREATE_DETERMINISTIC_ACCOUNT:
+        CreateDeterminisiticAccountResult createDeterminisiticAccountResult;
     }
     tr;
 default:
