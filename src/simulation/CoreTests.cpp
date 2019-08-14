@@ -51,7 +51,7 @@ printStats(int& nLedgers, std::chrono::system_clock::time_point tBegin,
     LOG(INFO) << sim->metricsSummary("scp");
 }
 
-TEST_CASE("3 nodes 2 running threshold 2", "[simulation][core3][acceptance]")
+TEST_CASE("3 nodes 2 running threshold 2", "[simulation][core3]")
 {
     Simulation::Mode mode = Simulation::OVER_LOOPBACK;
     SECTION("Over loopback")
@@ -104,8 +104,7 @@ TEST_CASE("3 nodes 2 running threshold 2", "[simulation][core3][acceptance]")
     LOG(DEBUG) << "done with core3 test";
 }
 
-TEST_CASE("core topology 4 ledgers at scales 2 to 4",
-          "[simulation][acceptance]")
+TEST_CASE("core topology 4 ledgers at scales 2 to 4", "[simulation]")
 {
     Simulation::Mode mode = Simulation::OVER_LOOPBACK;
     SECTION("Over loopback")
@@ -246,7 +245,7 @@ hierarchicalTopoTest(int nLedgers, int nBranches, Simulation::Mode mode,
     REQUIRE(sim->haveAllExternalized(nLedgers + 1, 5));
 }
 
-TEST_CASE("hierarchical topology scales 1 to 3", "[simulation][acceptance]")
+TEST_CASE("hierarchical topology scales 1 to 3", "[simulation]")
 {
     Hash networkID = sha256(getTestConfig().NETWORK_PASSPHRASE);
     Simulation::Mode mode = Simulation::OVER_LOOPBACK;
@@ -290,7 +289,7 @@ hierarchicalSimplifiedTest(int nLedgers, int nbCore, int nbOuterNodes,
     REQUIRE(sim->haveAllExternalized(nLedgers + 1, 3));
 }
 
-TEST_CASE("core nodes with outer nodes", "[simulation][acceptance]")
+TEST_CASE("core nodes with outer nodes", "[simulation]")
 {
     Hash networkID = sha256(getTestConfig().NETWORK_PASSPHRASE);
     Simulation::Mode mode = Simulation::OVER_LOOPBACK;

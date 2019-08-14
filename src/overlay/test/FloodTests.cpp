@@ -26,7 +26,7 @@ namespace stellar
 {
 using namespace txtest;
 
-TEST_CASE("Flooding", "[flood][overlay][acceptance]")
+TEST_CASE("Flooding", "[flood][overlay]")
 {
     Hash networkID = sha256(getTestConfig().NETWORK_PASSPHRASE);
     Simulation::pointer simulation;
