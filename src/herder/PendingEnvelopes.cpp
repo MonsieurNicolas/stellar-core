@@ -11,6 +11,7 @@
 #include "scp/QuorumSetUtils.h"
 #include "scp/Slot.h"
 #include "util/Logging.h"
+#include <unordered_set>
 #include <xdrpp/marshal.h>
 
 using namespace std;
@@ -72,6 +73,8 @@ PendingEnvelopes::addSCPQuorumSet(Hash hash, const SCPQuorumSet& q)
 
     auto qset = std::make_shared<SCPQuorumSet>(q);
     mKnownQSet.emplace(hash, qset);
+
+    DropUnrefencedQsets();
 
     mQuorumSetFetcher.recv(hash);
 }
@@ -332,7 +335,7 @@ PendingEnvelopes::startFetch(SCPEnvelope const& envelope)
 {
     Hash h = Slot::getCompanionQuorumSetHashFromStatement(envelope.statement);
 
-    if (mKnownQSet.find(h) != mKnownQSet.end())
+    if (mKnownQSet.find(h) == mKnownQSet.end())
     {
         mQuorumSetFetcher.fetch(h, envelope);
     }
@@ -584,5 +587,67 @@ PendingEnvelopes::envelopeProcessed(SCPEnvelope const& env)
         // could not expand quorum, queue up a rebuild
         mRebuildQuorum = true;
     }
+}
+
+void
+PendingEnvelopes::DropUnrefencedQsets()
+{
+    if (true)
+    {
+        return;
+    }
+
+    std::unordered_map<Hash, SCPQuorumSetPtr> qsets;
+
+    auto addQset = [&](SCPEnvelope const& e) {
+        auto r = qsets.emplace(
+            Slot::getCompanionQuorumSetHashFromStatement(e.statement),
+            SCPQuorumSetPtr());
+        if (r.second)
+        {
+            // if we didn't know of this hash, also set the QSet
+            r.first->second = getQSet(r.first->first);
+        }
+    };
+
+    // computes the qsets referenced
+    // by all slots
+    auto itt = mHerder.getSCP().descSlots();
+    for (; itt.first != itt.second; ++itt.first)
+    {
+        auto slot = *itt.first;
+        mHerder.getSCP().processCurrentState(slot, [&](SCPEnvelope const& e) {
+            addQset(e);
+            return true;
+        });
+    }
+    // now, compute qsets referenced by pending envelopes
+    // NB: don't consider "processed" as "ready" is the subset of processed
+    // that is still owned by this class
+    for (auto const& ee : mEnvelopes)
+    {
+        for (auto const& e : ee.second.mFetchingEnvelopes)
+        {
+            addQset(e.first);
+        }
+        for (auto const& e : ee.second.mReadyEnvelopes)
+        {
+            addQset(e);
+        }
+    }
+
+    // transform into map of known quorum sets (not just referenced)
+    for (auto it = qsets.begin(); it != qsets.end();)
+    {
+        if (it->second == nullptr)
+        {
+            it = qsets.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    mKnownQSet = std::move(qsets);
 }
 }

@@ -149,5 +149,8 @@ class PendingEnvelopes
 
     // updates internal state when an envelope was succesfuly processed
     void envelopeProcessed(SCPEnvelope const& env);
+
+    // erases qsets not referenced anymore
+    void DropUnrefencedQsets();
 };
 }
