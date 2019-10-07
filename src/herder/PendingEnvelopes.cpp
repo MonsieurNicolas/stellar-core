@@ -74,9 +74,14 @@ PendingEnvelopes::addSCPQuorumSet(Hash hash, const SCPQuorumSet& q)
     auto qset = std::make_shared<SCPQuorumSet>(q);
     mKnownQSet.emplace(hash, qset);
 
-    DropUnrefencedQsets();
-
     mQuorumSetFetcher.recv(hash);
+
+    // trigger cleanup of quorum sets if we have too many of them
+    if (mKnownQSet.size() >
+        mQuorumTracker.getQuorum().size() * 2 * Herder::MAX_SLOTS_TO_REMEMBER)
+    {
+        DropUnrefencedQsets();
+    }
 }
 
 bool
@@ -592,11 +597,6 @@ PendingEnvelopes::envelopeProcessed(SCPEnvelope const& env)
 void
 PendingEnvelopes::DropUnrefencedQsets()
 {
-    if (true)
-    {
-        return;
-    }
-
     std::unordered_map<Hash, SCPQuorumSetPtr> qsets;
 
     auto addQset = [&](SCPEnvelope const& e) {
@@ -610,8 +610,15 @@ PendingEnvelopes::DropUnrefencedQsets()
         }
     };
 
+    auto& scp = mHerder.getSCP();
+    qsets.emplace(
+        scp.getLocalNode()->getQuorumSetHash(),
+                  std::make_shared<SCPQuorumSet>(
+                      scp.getLocalQuorumSet()));
+
     // computes the qsets referenced
     // by all slots
+
     auto itt = mHerder.getSCP().descSlots();
     for (; itt.first != itt.second; ++itt.first)
     {
@@ -620,6 +627,14 @@ PendingEnvelopes::DropUnrefencedQsets()
             addQset(e);
             return true;
         });
+    }
+    for (auto const& q : mQuorumTracker.getQuorum())
+    {
+        if (q.second)
+        {
+        auto qHash = sha256(xdr::xdr_to_opaque(*q.second));
+        qsets.emplace(qHash, q.second);
+        }
     }
     // now, compute qsets referenced by pending envelopes
     // NB: don't consider "processed" as "ready" is the subset of processed

@@ -102,16 +102,20 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
     }
     auto bigQSetHash = sha256(xdr::xdr_to_opaque(bigQSet));
 
+    auto sane2QSet = makeSingleton(keys[1]);
+    auto sane2QSetHash = sha256(xdr::xdr_to_opaque(sane2QSet));
+
     auto transactions = makeTransactions(lcl.hash, 50);
     auto p = makeTxPair(transactions, 10);
     auto saneEnvelope =
-        makeEnvelope(0, p, saneQSetHash, lcl.header.ledgerSeq + 1);
+        makeEnvelope(1, p, saneQSetHash, lcl.header.ledgerSeq + 1);
     auto bigEnvelope =
-        makeEnvelope(1, p, bigQSetHash, lcl.header.ledgerSeq + 1);
+        makeEnvelope(2, p, bigQSetHash, lcl.header.ledgerSeq + 1);
+    auto sane2Envelope =
+        makeEnvelope(3, p, sane2QSetHash, lcl.header.ledgerSeq + 1);
 
-    //PendingEnvelopes pendingEnvelopes{*app, herder};
-    auto& pendingEnvelopes =
-        herder.getPendingEnvelopes();
+    // PendingEnvelopes pendingEnvelopes{*app, herder};
+    auto& pendingEnvelopes = herder.getPendingEnvelopes();
 
     SECTION("return FETCHING when first receiving envelope")
     {
@@ -149,7 +153,7 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                 p.second));
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_READY);
+                    Herder::ENVELOPE_STATUS_PROCESSED);
 
             REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
@@ -158,51 +162,37 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
             {
                 SECTION("sane followed by big")
                 {
-                SCPEnvelope popped;
-                REQUIRE(pendingEnvelopes.pop(lcl.header.ledgerSeq + 1, popped));
-                REQUIRE(popped == saneEnvelope);
+                    REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
+                            Herder::ENVELOPE_STATUS_PROCESSED);
 
-                REQUIRE(!pendingEnvelopes.pop(lcl.header.ledgerSeq + 1, popped));
+                    herder.recvSCPEnvelope(saneEnvelope);
 
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                        Herder::ENVELOPE_STATUS_PROCESSED);
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                        Herder::ENVELOPE_STATUS_PROCESSED);
+                    pendingEnvelopes.DropUnrefencedQsets();
+                    REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) ==
+                            saneQSet);
 
-                herder.recvSCPEnvelope(saneEnvelope);
+                    // now receive sane2Envelope
 
-                pendingEnvelopes.DropUnrefencedQsets();
-                REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
+                    REQUIRE(pendingEnvelopes.recvSCPEnvelope(sane2Envelope) ==
+                            Herder::ENVELOPE_STATUS_FETCHING);
 
-                // now receive bigEnvelope
+                    pendingEnvelopes.DropUnrefencedQsets();
+                    REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) ==
+                            saneQSet);
+                    REQUIRE(pendingEnvelopes.getQSet(sane2QSetHash) == nullptr);
 
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(bigEnvelope) ==
-                        Herder::ENVELOPE_STATUS_FETCHING);
+                    // receive quorum set
+                    REQUIRE(pendingEnvelopes.recvSCPQuorumSet(sane2QSetHash,
+                                                              sane2QSet));
 
-                pendingEnvelopes.DropUnrefencedQsets();
-                REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
-                REQUIRE(pendingEnvelopes.getQSet(bigQSetHash) == nullptr);
+                    REQUIRE(pendingEnvelopes.recvSCPEnvelope(sane2Envelope) ==
+                            Herder::ENVELOPE_STATUS_PROCESSED);
 
-REQUIRE(
-                    pendingEnvelopes.recvSCPQuorumSet(bigQSetHash, bigQSet));
-
-                pendingEnvelopes.DropUnrefencedQsets();
-REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
-REQUIRE(*pendingEnvelopes.getQSet(bigQSetHash) == bigQSet);
-
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(bigEnvelope) ==
-        Herder::ENVELOPE_STATUS_READY);
-
-                REQUIRE(pendingEnvelopes.pop(lcl.header.ledgerSeq + 1, popped));
-REQUIRE(popped == bigEnvelope);
-                REQUIRE(!pendingEnvelopes.pop(lcl.header.ledgerSeq + 1, popped));
-
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(bigEnvelope) ==
-                        Herder::ENVELOPE_STATUS_PROCESSED);
-
-                pendingEnvelopes.DropUnrefencedQsets();
-                REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
-                REQUIRE(*pendingEnvelopes.getQSet(bigQSetHash) == bigQSet);
+                    pendingEnvelopes.DropUnrefencedQsets();
+                    REQUIRE(pendingEnvelopes.getQSet(saneQSetHash) ==
+                            nullptr);
+                    REQUIRE(*pendingEnvelopes.getQSet(sane2QSetHash) ==
+                            sane2QSet);
                 }
             }
         }
@@ -221,19 +211,16 @@ REQUIRE(popped == bigEnvelope);
             REQUIRE(pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
             REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_READY);
+                    Herder::ENVELOPE_STATUS_PROCESSED);
 
             REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                 p.second));
 
-            SECTION("and then PROCESSED")
-            {
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                        Herder::ENVELOPE_STATUS_PROCESSED);
-                REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                        Herder::ENVELOPE_STATUS_PROCESSED);
-            }
+            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
+                    Herder::ENVELOPE_STATUS_PROCESSED);
+            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
+                    Herder::ENVELOPE_STATUS_PROCESSED);
         }
     }
 
@@ -255,7 +242,7 @@ REQUIRE(popped == bigEnvelope);
         }
 
         REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                Herder::ENVELOPE_STATUS_READY);
+                Herder::ENVELOPE_STATUS_PROCESSED);
         REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
                 Herder::ENVELOPE_STATUS_PROCESSED);
     }
@@ -292,10 +279,10 @@ REQUIRE(popped == bigEnvelope);
             "tx set")
     {
         auto saneEnvelope2 = makeEnvelope(
-            0, p, saneQSetHash,
+            1, p, saneQSetHash,
             lcl.header.ledgerSeq + Herder::MAX_SLOTS_TO_REMEMBER + 1);
         auto saneEnvelope3 = makeEnvelope(
-            0, p, saneQSetHash,
+            1, p, saneQSetHash,
             lcl.header.ledgerSeq + 2 * Herder::MAX_SLOTS_TO_REMEMBER + 1);
 
         REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
@@ -304,7 +291,7 @@ REQUIRE(popped == bigEnvelope);
         REQUIRE(
             pendingEnvelopes.recvTxSet(p.second->getContentsHash(), p.second));
         REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                Herder::ENVELOPE_STATUS_READY);
+                Herder::ENVELOPE_STATUS_PROCESSED);
 
         SECTION("with slotIndex difference less or equal than "
                 "MAX_SLOTS_TO_REMEMBER")
@@ -312,11 +299,11 @@ REQUIRE(popped == bigEnvelope);
             pendingEnvelopes.eraseBelow(saneEnvelope2.statement.slotIndex -
                                         Herder::MAX_SLOTS_TO_REMEMBER);
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope2) ==
-                    Herder::ENVELOPE_STATUS_READY);
+                    Herder::ENVELOPE_STATUS_PROCESSED);
             pendingEnvelopes.eraseBelow(saneEnvelope3.statement.slotIndex -
                                         Herder::MAX_SLOTS_TO_REMEMBER);
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope3) ==
-                    Herder::ENVELOPE_STATUS_READY);
+                    Herder::ENVELOPE_STATUS_PROCESSED);
         }
 
         SECTION("with slotIndex difference bigger than MAX_SLOTS_TO_REMEMBER")
