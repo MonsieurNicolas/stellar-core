@@ -28,6 +28,7 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
     auto const& lcl = app->getLedgerManager().getLastClosedLedgerHeader();
 
     auto& herder = static_cast<HerderImpl&>(app->getHerder());
+    auto& scp = herder.getSCP();
 
     auto root = TestAccount::createRoot(*app);
     auto a1 = TestAccount{*app, getAccount("A")};
@@ -114,90 +115,86 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
     auto sane2Envelope =
         makeEnvelope(3, p, sane2QSetHash, lcl.header.ledgerSeq + 1);
 
-    // PendingEnvelopes pendingEnvelopes{*app, herder};
+    auto scpKnows = [&](SCPEnvelope const& e) {
+        auto lastM = scp.getLatestMessage(e.statement.nodeID);
+        return lastM != nullptr && *lastM == e;
+    };
+
     auto& pendingEnvelopes = herder.getPendingEnvelopes();
 
-    SECTION("return FETCHING when first receiving envelope")
+    SECTION("receving envelope first")
     {
-        // check if the return value change only when it was READY on previous
-        // call
-        REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
+        REQUIRE(herder.recvSCPEnvelope(saneEnvelope) ==
                 Herder::ENVELOPE_STATUS_FETCHING);
-        REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
+        REQUIRE(!pendingEnvelopes.isProcessed(saneEnvelope));
+        REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
+        // still fetching on second call
+        REQUIRE(herder.recvSCPEnvelope(saneEnvelope) ==
                 Herder::ENVELOPE_STATUS_FETCHING);
-
+        REQUIRE(!pendingEnvelopes.isProcessed(saneEnvelope));
+        REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
         REQUIRE(pendingEnvelopes.getQSet(saneQSetHash) == nullptr);
         pendingEnvelopes.DropUnrefencedQsets();
 
-        SECTION("and then READY when all data came (quorum set first)")
+        SECTION("processes when receive qset and then txset")
         {
             REQUIRE(pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
-
+            REQUIRE(!pendingEnvelopes.isProcessed(saneEnvelope));
+            REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
             REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
 
             pendingEnvelopes.DropUnrefencedQsets();
             REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
 
-            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_FETCHING);
             REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
 
             pendingEnvelopes.DropUnrefencedQsets();
             REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
 
-            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_FETCHING);
+            REQUIRE(!pendingEnvelopes.isProcessed(saneEnvelope));
+            REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
 
+            REQUIRE(!scpKnows(saneEnvelope));
+
+            // tx set triggers processing
             REQUIRE(pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                p.second));
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                 p.second));
+            REQUIRE(scpKnows(saneEnvelope));
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
                     Herder::ENVELOPE_STATUS_PROCESSED);
+            REQUIRE(pendingEnvelopes.isProcessed(saneEnvelope));
+            REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
 
             REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                 p.second));
-            SECTION("and then PROCESSED")
-            {
-                SECTION("sane followed by big")
-                {
-                    REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                            Herder::ENVELOPE_STATUS_PROCESSED);
 
-                    herder.recvSCPEnvelope(saneEnvelope);
+            // now receive sane2Envelope that depends on the same txset,
+            // different qset
 
-                    pendingEnvelopes.DropUnrefencedQsets();
-                    REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) ==
-                            saneQSet);
+            REQUIRE(herder.recvSCPEnvelope(sane2Envelope) ==
+                    Herder::ENVELOPE_STATUS_FETCHING);
 
-                    // now receive sane2Envelope
+            pendingEnvelopes.DropUnrefencedQsets();
+            REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
+            REQUIRE(pendingEnvelopes.getQSet(sane2QSetHash) == nullptr);
 
-                    REQUIRE(pendingEnvelopes.recvSCPEnvelope(sane2Envelope) ==
-                            Herder::ENVELOPE_STATUS_FETCHING);
+            // receive quorum set causes it to be processed
+            REQUIRE(
+                pendingEnvelopes.recvSCPQuorumSet(sane2QSetHash, sane2QSet));
+            REQUIRE(!scpKnows(saneEnvelope));
+            REQUIRE(scpKnows(sane2Envelope));
+            REQUIRE(pendingEnvelopes.recvSCPEnvelope(sane2Envelope) ==
+                    Herder::ENVELOPE_STATUS_PROCESSED);
 
-                    pendingEnvelopes.DropUnrefencedQsets();
-                    REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) ==
-                            saneQSet);
-                    REQUIRE(pendingEnvelopes.getQSet(sane2QSetHash) == nullptr);
-
-                    // receive quorum set
-                    REQUIRE(pendingEnvelopes.recvSCPQuorumSet(sane2QSetHash,
-                                                              sane2QSet));
-
-                    REQUIRE(pendingEnvelopes.recvSCPEnvelope(sane2Envelope) ==
-                            Herder::ENVELOPE_STATUS_PROCESSED);
-
-                    pendingEnvelopes.DropUnrefencedQsets();
-                    REQUIRE(pendingEnvelopes.getQSet(saneQSetHash) ==
-                            nullptr);
-                    REQUIRE(*pendingEnvelopes.getQSet(sane2QSetHash) ==
-                            sane2QSet);
-                }
-            }
+            pendingEnvelopes.DropUnrefencedQsets();
+            REQUIRE(pendingEnvelopes.getQSet(saneQSetHash) == nullptr);
+            REQUIRE(*pendingEnvelopes.getQSet(sane2QSetHash) == sane2QSet);
         }
 
-        SECTION("and then READY when all data came (tx set first)")
+        SECTION("processes when receive txset and then qset")
         {
             REQUIRE(pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                p.second));
