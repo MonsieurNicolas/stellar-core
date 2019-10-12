@@ -29,7 +29,6 @@ PendingEnvelopes::PendingEnvelopes(Application& app, HerderImpl& herder)
           app, [](Peer::pointer peer, Hash hash) { peer->sendGetTxSet(hash); })
     , mQuorumSetFetcher(app, [](Peer::pointer peer,
                                 Hash hash) { peer->sendGetQuorumSet(hash); })
-    , mTxSetCache(TXSET_CACHE_SIZE)
     , mRebuildQuorum(true)
     , mQuorumTracker(mHerder.getSCP())
     , mProcessedCount(
@@ -152,7 +151,7 @@ PendingEnvelopes::addTxSet(Hash const& hash, uint64 lastSeenSlotIndex,
 {
     CLOG(TRACE, "Herder") << "Add TxSet " << hexAbbrev(hash);
 
-    mTxSetCache.put(hash, std::make_pair(lastSeenSlotIndex, txset));
+    mTxSetCache.emplace(hash, std::make_pair(lastSeenSlotIndex, txset));
     mTxSetFetcher.recv(hash);
 }
 
@@ -333,7 +332,8 @@ PendingEnvelopes::isFullyFetched(SCPEnvelope const& envelope)
     auto txSetHashes = getTxSetHashes(envelope);
     return std::all_of(std::begin(txSetHashes), std::end(txSetHashes),
                        [this](Hash const& txSetHash) {
-                           return mTxSetCache.exists(txSetHash);
+                           return mTxSetCache.find(txSetHash) !=
+                                  mTxSetCache.end();
                        });
 }
 
@@ -349,7 +349,7 @@ PendingEnvelopes::startFetch(SCPEnvelope const& envelope)
 
     for (auto const& h2 : getTxSetHashes(envelope))
     {
-        if (!mTxSetCache.exists(h2))
+        if (mTxSetCache.find(h2) == mTxSetCache.end())
         {
             mTxSetFetcher.fetch(h2, envelope);
         }
@@ -382,9 +382,10 @@ PendingEnvelopes::touchFetchCache(SCPEnvelope const& envelope)
 
     for (auto const& h : getTxSetHashes(envelope))
     {
-        if (mTxSetCache.exists(h))
+        auto it = mTxSetCache.find(h);
+        if (it != mTxSetCache.end())
         {
-            auto& item = mTxSetCache.get(h);
+            auto& item = it->second;
             item.first = std::max(item.first, envelope.statement.slotIndex);
         }
     }
@@ -436,9 +437,18 @@ PendingEnvelopes::eraseBelow(uint64 slotIndex)
 
     // 0 is special mark for data that we do not know the slot index
     // it is used for state loaded from database
-    mTxSetCache.erase_if([&](TxSetFramCacheItem const& i) {
-        return i.first != 0 && i.first < slotIndex;
-    });
+    for (auto it = mTxSetCache.begin(); it != mTxSetCache.end();)
+    {
+        auto& item = it->second;
+        if (item.first != 0 && item.first < slotIndex)
+        {
+            it = mTxSetCache.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    };
 
     updateMetrics();
 }
@@ -460,8 +470,18 @@ PendingEnvelopes::slotClosed(uint64 slotIndex)
         mTxSetFetcher.stopFetchingBelow(slotIndex + 1);
         mQuorumSetFetcher.stopFetchingBelow(slotIndex + 1);
 
-        mTxSetCache.erase_if(
-            [&](TxSetFramCacheItem const& i) { return i.first == slotIndex; });
+        for (auto it = mTxSetCache.begin(); it != mTxSetCache.end();)
+        {
+            auto& item = it->second;
+            if (item.first == slotIndex)
+            {
+                it = mTxSetCache.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        };
     }
 
     updateMetrics();
@@ -470,12 +490,8 @@ PendingEnvelopes::slotClosed(uint64 slotIndex)
 TxSetFramePtr
 PendingEnvelopes::getTxSet(Hash const& hash)
 {
-    if (mTxSetCache.exists(hash))
-    {
-        return mTxSetCache.get(hash).second;
-    }
-
-    return TxSetFramePtr();
+    auto it = mTxSetCache.find(hash);
+    return (it != mTxSetCache.end()) ? it->second.second : TxSetFramePtr();
 }
 
 SCPQuorumSetPtr

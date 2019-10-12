@@ -54,7 +54,7 @@ class PendingEnvelopes
 
     using TxSetFramCacheItem = std::pair<uint64, TxSetFramePtr>;
     // all the txsets we have learned about per ledger#
-    cache::lru_cache<Hash, TxSetFramCacheItem> mTxSetCache;
+    std::unordered_map<Hash, TxSetFramCacheItem> mTxSetCache;
 
     bool mRebuildQuorum;
     QuorumTracker mQuorumTracker;
