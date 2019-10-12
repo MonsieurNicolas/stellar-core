@@ -198,26 +198,29 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
         {
             REQUIRE(pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                p.second));
-            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_FETCHING);
+
+            REQUIRE(!pendingEnvelopes.isProcessed(saneEnvelope));
+            REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
+            REQUIRE(pendingEnvelopes.getQSet(saneQSetHash) == nullptr);
+
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                 p.second));
-            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_FETCHING);
 
+            REQUIRE(!scpKnows(saneEnvelope));
+
+            // qset triggers processing
             REQUIRE(pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
-            REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
+
+            REQUIRE(*pendingEnvelopes.getQSet(saneQSetHash) == saneQSet);
+            REQUIRE(scpKnows(saneEnvelope));
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
                     Herder::ENVELOPE_STATUS_PROCESSED);
+            REQUIRE(pendingEnvelopes.isProcessed(saneEnvelope));
+            REQUIRE(!pendingEnvelopes.isReady(saneEnvelope));
 
             REQUIRE(!pendingEnvelopes.recvSCPQuorumSet(saneQSetHash, saneQSet));
             REQUIRE(!pendingEnvelopes.recvTxSet(p.second->getContentsHash(),
                                                 p.second));
-
-            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_PROCESSED);
-            REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                    Herder::ENVELOPE_STATUS_PROCESSED);
         }
     }
 

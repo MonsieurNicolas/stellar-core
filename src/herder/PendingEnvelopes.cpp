@@ -75,13 +75,6 @@ PendingEnvelopes::addSCPQuorumSet(Hash const& hash, const SCPQuorumSet& q)
     mKnownQSet.emplace(hash, qset);
 
     mQuorumSetFetcher.recv(hash);
-
-    // trigger cleanup of quorum sets if we have too many of them
-    if (mKnownQSet.size() >
-        mQuorumTracker.getQuorum().size() * 2 * Herder::MAX_SLOTS_TO_REMEMBER)
-    {
-        DropUnrefencedQsets();
-    }
 }
 
 bool
@@ -95,16 +88,27 @@ PendingEnvelopes::recvSCPQuorumSet(Hash const& hash, const SCPQuorumSet& q)
         return false;
     }
 
+    bool res;
+
     if (isQuorumSetSane(q, false))
     {
         addSCPQuorumSet(hash, q);
-        return true;
+        res = true;
     }
     else
     {
         discardSCPEnvelopesWithQSet(hash);
-        return false;
+        res = false;
     }
+
+    // trigger cleanup of quorum sets if we have too many of them
+    if (mKnownQSet.size() >
+        mQuorumTracker.getQuorum().size() * 2 * Herder::MAX_SLOTS_TO_REMEMBER)
+    {
+        DropUnrefencedQsets();
+    }
+
+    return res;
 }
 
 void
@@ -232,10 +236,6 @@ PendingEnvelopes::recvSCPEnvelope(SCPEnvelope const& envelope)
         // check if we are done fetching it
         if (isFullyFetched(envelope))
         {
-            // move the item from fetching to processed
-            processed.emplace(envelope);
-            fetching.erase(fetchit);
-
             std::chrono::nanoseconds durationNano =
                 std::chrono::steady_clock::now() - fetchit->second;
             mFetchDuration.Update(durationNano);
@@ -244,6 +244,10 @@ PendingEnvelopes::recvSCPEnvelope(SCPEnvelope const& envelope)
                 << hexAbbrev(sha256(xdr::xdr_to_opaque(envelope))) << " in "
                 << std::chrono::duration<double>(durationNano).count()
                 << " seconds";
+
+            // move the item from fetching to processed
+            processed.emplace(envelope);
+            fetching.erase(fetchit);
 
             envelopeReady(envelope);
             updateMetrics();
@@ -609,12 +613,13 @@ PendingEnvelopes::DropUnrefencedQsets()
     };
 
     auto& scp = mHerder.getSCP();
+
+    // add self
     qsets.emplace(scp.getLocalNode()->getQuorumSetHash(),
                   std::make_shared<SCPQuorumSet>(scp.getLocalQuorumSet()));
 
     // computes the qsets referenced
     // by all slots
-
     auto itt = mHerder.getSCP().descSlots();
     for (; itt.first != itt.second; ++itt.first)
     {
