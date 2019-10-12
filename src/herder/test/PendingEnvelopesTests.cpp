@@ -227,13 +227,13 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
     SECTION("return READY when receiving envelope with quorum set and tx set "
             "that were manually added before")
     {
-        SECTION("as not-removable")
+        SECTION("txset not-removable")
         {
             pendingEnvelopes.addSCPQuorumSet(saneQSetHash, saneQSet);
             pendingEnvelopes.addTxSet(p.second->getContentsHash(), 0, p.second);
         }
 
-        SECTION("as removable")
+        SECTION("txset removable")
         {
             pendingEnvelopes.addSCPQuorumSet(saneQSetHash, saneQSet);
             pendingEnvelopes.addTxSet(p.second->getContentsHash(),
@@ -242,7 +242,7 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
         }
 
         REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
-                Herder::ENVELOPE_STATUS_PROCESSED);
+                Herder::ENVELOPE_STATUS_READY);
         REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope) ==
                 Herder::ENVELOPE_STATUS_PROCESSED);
     }
@@ -299,11 +299,11 @@ TEST_CASE("PendingEnvelopes recvSCPEnvelope", "[herder]")
             pendingEnvelopes.eraseBelow(saneEnvelope2.statement.slotIndex -
                                         Herder::MAX_SLOTS_TO_REMEMBER);
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope2) ==
-                    Herder::ENVELOPE_STATUS_PROCESSED);
+                    Herder::ENVELOPE_STATUS_READY);
             pendingEnvelopes.eraseBelow(saneEnvelope3.statement.slotIndex -
                                         Herder::MAX_SLOTS_TO_REMEMBER);
             REQUIRE(pendingEnvelopes.recvSCPEnvelope(saneEnvelope3) ==
-                    Herder::ENVELOPE_STATUS_PROCESSED);
+                    Herder::ENVELOPE_STATUS_READY);
         }
 
         SECTION("with slotIndex difference bigger than MAX_SLOTS_TO_REMEMBER")
