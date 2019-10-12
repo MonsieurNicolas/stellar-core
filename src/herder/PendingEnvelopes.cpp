@@ -624,10 +624,12 @@ PendingEnvelopes::DropUnrefencedQsets()
     for (; itt.first != itt.second; ++itt.first)
     {
         auto slot = *itt.first;
-        mHerder.getSCP().processCurrentState(slot, [&](SCPEnvelope const& e) {
-            addQset(e);
-            return true;
-        });
+        mHerder.getSCP().processCurrentState(slot,
+                                             [&](SCPEnvelope const& e) {
+                                                 addQset(e);
+                                                 return true;
+                                             },
+                                             true);
     }
     for (auto const& q : mQuorumTracker.getQuorum())
     {
