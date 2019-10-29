@@ -173,11 +173,7 @@ PendingEnvelopes::recvTxSet(Hash const& hash, TxSetFramePtr txset)
 bool
 PendingEnvelopes::isNodeDefinitelyInQuorum(NodeID const& node)
 {
-    if (mRebuildQuorum)
-    {
-        rebuildQuorumTrackerState();
-        mRebuildQuorum = false;
-    }
+    rebuildQuorumTrackerState(false);
     return mQuorumTracker.isNodeDefinitelyInQuorum(node);
 }
 
@@ -555,8 +551,13 @@ PendingEnvelopes::getJsonInfo(size_t limit)
 }
 
 void
-PendingEnvelopes::rebuildQuorumTrackerState()
+PendingEnvelopes::rebuildQuorumTrackerState(bool force)
 {
+    if (!force && !mRebuildQuorum)
+    {
+        return;
+    }
+    mRebuildQuorum = false;
     // rebuild quorum information using data sources starting with the
     // freshest source
     mQuorumTracker.rebuild([&](NodeID const& id) -> SCPQuorumSetPtr {
@@ -647,6 +648,8 @@ PendingEnvelopes::DropUnrefencedQsets()
                                              },
                                              true);
     }
+    // add qsets referenced by quorum
+    rebuildQuorumTrackerState(false);
     for (auto const& q : mQuorumTracker.getQuorum())
     {
         if (q.second)
