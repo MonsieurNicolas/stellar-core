@@ -18,7 +18,7 @@
 #include "util/types.h"
 #include <cereal/archives/json.hpp>
 #include <cereal/cereal.hpp>
-#include <lib/util/format.h>
+#include <fmt/format.h>
 #include <xdrpp/marshal.h>
 
 namespace cereal
@@ -177,17 +177,20 @@ Upgrades::toString(LedgerUpgrade const& upgrade)
 std::string
 Upgrades::toString() const
 {
-    fmt::MemoryWriter r;
+    std::stringstream r;
+    bool first = true;
 
     auto appendInfo = [&](std::string const& s, optional<uint32> const& o) {
         if (o)
         {
-            if (!r.size())
+            if (first)
             {
-                r << "upgradetime="
-                  << VirtualClock::pointToISOString(mParams.mUpgradeTime);
+                r << fmt::format(
+                    "upgradetime={}",
+                    VirtualClock::pointToISOString(mParams.mUpgradeTime));
             }
-            r << ", " << s << "=" << *o;
+            r << fmt::format(", {}={}", s, *o);
+            first = false;
         }
     };
     appendInfo("protocolversion", mParams.mProtocolVersion);

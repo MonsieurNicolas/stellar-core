@@ -31,7 +31,7 @@
 #include "util/GlobalChecks.h"
 #include "util/Logging.h"
 #include "util/XDROperators.h"
-#include "util/format.h"
+#include <fmt/format.h>
 
 #include "medida/counter.h"
 #include "medida/meter.h"

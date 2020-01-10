@@ -28,9 +28,9 @@
 #include "test/test.h"
 #endif
 
+#include <fmt/format.h>
 #include <iostream>
 #include <lib/clara.hpp>
-#include <lib/util/format.h>
 
 namespace stellar
 {

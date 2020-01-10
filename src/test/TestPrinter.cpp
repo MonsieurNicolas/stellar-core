@@ -3,8 +3,8 @@
 // of this distribution or at http://www.apache.org/licenses/LICENSE-2.0
 
 #include "test/TestPrinter.h"
-#include "lib/util/format.h"
 #include "test/TestMarket.h"
+#include <fmt/format.h>
 
 namespace Catch
 {

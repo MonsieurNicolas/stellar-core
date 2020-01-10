@@ -219,9 +219,6 @@
     <ClCompile Include="..\..\lib\xdrpp\tests\srpc.cc">
       <Filter>lib\xdrpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\lib\util\format.cc">
-      <Filter>lib\util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\lib\asio.cpp">
       <Filter>lib</Filter>
     </ClCompile>
@@ -1075,9 +1072,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\types.h">
       <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\lib\util\format.h">
-      <Filter>lib\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\lib\util\uint128_t.h">
       <Filter>lib\util</Filter>

@@ -5,7 +5,7 @@
 #include "util/Fs.h"
 #include "util/XDROperators.h"
 #include "util/XDRStream.h"
-#include "util/format.h"
+#include <fmt/format.h>
 #include <iostream>
 #include <regex>
 #include <xdrpp/printer.h>

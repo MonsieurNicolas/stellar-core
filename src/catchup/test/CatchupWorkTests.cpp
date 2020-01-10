@@ -10,8 +10,8 @@
 #include "test/test.h"
 #include "util/Logging.h"
 #include "util/Timer.h"
+#include <fmt/format.h>
 #include <lib/catch.hpp>
-#include <lib/util/format.h>
 
 using namespace stellar;
 
