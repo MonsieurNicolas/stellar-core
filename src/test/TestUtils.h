@@ -82,4 +82,28 @@ std::tm getTestDateTime(int day, int month, int year, int hour, int minute,
                         int second);
 
 VirtualClock::time_point genesis(int minute, int second);
+
+// checks if a metric has the expected value
+class MetricValueChecker : public medida::MetricProcessor
+{
+  public:
+    using CheckerPred = std::function<void(uint64)>;
+
+    MetricValueChecker(uint64 expectedValue);
+    MetricValueChecker(CheckerPred const& check);
+
+    void Process(medida::Counter& counter);
+
+    void Process(medida::Meter& meter) override;
+
+    void Process(medida::Histogram& histogram) override;
+
+    void
+    check(std::map<medida::MetricName,
+                   std::shared_ptr<medida::MetricInterface>> const& metrics,
+          medida::MetricName const& m);
+
+  private:
+    CheckerPred mChecker;
+};
 }

@@ -6,6 +6,7 @@
 #include "overlay/test/LoopbackPeer.h"
 #include "test/test.h"
 #include "work/WorkScheduler.h"
+#include <catch.hpp>
 
 namespace stellar
 {
@@ -128,5 +129,47 @@ genesis(int minute, int second)
 {
     return VirtualClock::tmToPoint(
         getTestDateTime(1, 7, 2014, 0, minute, second));
+}
+
+MetricValueChecker::MetricValueChecker(uint64 expectedValue)
+    : mChecker([expectedValue](uint64 v) { CHECK(v == expectedValue); })
+{
+}
+
+MetricValueChecker::MetricValueChecker(CheckerPred const& check)
+    : mChecker(check)
+{
+}
+
+void
+MetricValueChecker::Process(medida::Counter& counter)
+{
+    mChecker(counter.count());
+}
+void
+MetricValueChecker::Process(medida::Meter& meter)
+{
+    mChecker(meter.count());
+}
+
+void
+MetricValueChecker::Process(medida::Histogram& histogram)
+{
+    mChecker(histogram.count());
+}
+
+void
+MetricValueChecker::check(
+    std::map<medida::MetricName,
+             std::shared_ptr<medida::MetricInterface>> const& metrics,
+    medida::MetricName const& m)
+{
+    auto it = metrics.find(m);
+    bool found = (it != metrics.end());
+    CHECK(found);
+    if (found)
+    {
+        it->second->Process(*this);
+    }
 }
 }
