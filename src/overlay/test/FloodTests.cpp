@@ -16,6 +16,7 @@
 #include "simulation/Simulation.h"
 #include "simulation/Topologies.h"
 #include "test/TestAccount.h"
+#include "test/TestUtils.h"
 #include "test/TxTests.h"
 #include "test/test.h"
 #include "util/Logging.h"
@@ -126,6 +127,21 @@ TEST_CASE("Flooding", "[flood][overlay][acceptance]")
                        << out.str();
         }
         REQUIRE(checkSim());
+        // check metrics
+        for (auto const& n : simulation->getNodes())
+        {
+            auto m = n->getMetrics().GetAllMetrics();
+
+            // ideally tests would have no errors at all, but simulation is a
+            // bit flaky so we check that there are not too many errors instead
+            MetricValueChecker mcSmall([](uint64 v) { CHECK(v < 100); });
+            MetricValueChecker mcVerySmall([](uint64 v) { CHECK(v < 10); });
+
+            mcSmall.check(m, {"overlay", "item-fetcher", "next-peer"});
+            mcSmall.check(m, {"overlay", "recv", "dont-have"});
+            mcSmall.check(m, {"overlay", "send", "dont-have"});
+            mcVerySmall.check(m, {"overlay", "timeout", "idle"});
+        }
     };
 
     SECTION("transaction flooding")

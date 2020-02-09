@@ -159,6 +159,12 @@ MetricValueChecker::Process(medida::Histogram& histogram)
 }
 
 void
+MetricValueChecker::Process(medida::Timer& timer)
+{
+    mChecker(timer.count());
+}
+
+void
 MetricValueChecker::check(
     std::map<medida::MetricName,
              std::shared_ptr<medida::MetricInterface>> const& metrics,

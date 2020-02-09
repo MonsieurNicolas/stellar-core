@@ -98,6 +98,8 @@ class MetricValueChecker : public medida::MetricProcessor
 
     void Process(medida::Histogram& histogram) override;
 
+    void Process(medida::Timer& timer) override;
+
     void
     check(std::map<medida::MetricName,
                    std::shared_ptr<medida::MetricInterface>> const& metrics,
