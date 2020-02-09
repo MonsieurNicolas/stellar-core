@@ -134,8 +134,14 @@ TEST_CASE("Flooding", "[flood][overlay][acceptance]")
 
             // ideally tests would have no errors at all, but simulation is a
             // bit flaky so we check that there are not too many errors instead
-            MetricValueChecker mcSmall([](uint64 v) { CHECK(v < 100); });
-            MetricValueChecker mcVerySmall([](uint64 v) { CHECK(v < 10); });
+            MetricValueChecker mcSmall([&](uint64 v) {
+                LOG(INFO) << " got " << v;
+                CHECK(v < 100);
+            });
+            MetricValueChecker mcVerySmall([](uint64 v) {
+                LOG(INFO) << " got " << v;
+                CHECK(v < 10);
+            });
 
             mcSmall.check(m, {"overlay", "item-fetcher", "next-peer"});
             mcSmall.check(m, {"overlay", "recv", "dont-have"});
