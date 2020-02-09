@@ -141,7 +141,9 @@ class VirtualClock
 
     VirtualClock(Mode mode = VIRTUAL_TIME);
     ~VirtualClock();
-    size_t crank(bool block = true);
+    // executes work, batchSize represents the amount of work to pull from
+    // IOService at once
+    size_t crank(bool block = true, size_t batchSize = 100);
     void noteCrankOccurred(bool hadIdle);
     uint32_t recentIdleCrankPercent() const;
     void resetIdleCrankPercent();

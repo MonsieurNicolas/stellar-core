@@ -342,7 +342,9 @@ Simulation::crankNode(NodeID const& id, VirtualClock::time_point timeout)
     size_t count = 0;
     while (!doneWithQuantum)
     {
-        count += clock->crank(false);
+        // use a smaller batch size here than normal
+        // as we don't want nodes to do too much work by themselves
+        count += clock->crank(false, 10);
     }
     return count - quantumClicks;
 }

@@ -240,7 +240,7 @@ VirtualClock::setCurrentVirtualTime(time_point t)
 }
 
 size_t
-VirtualClock::crank(bool block)
+VirtualClock::crank(bool block, size_t batchSize)
 {
     if (mDestructing)
     {
@@ -267,7 +267,6 @@ VirtualClock::crank(bool block)
         // Pick up some work off the IO queue.
         // Calling mIOContext.poll() here may introduce unbounded delays
         // to trigger timers.
-        const size_t WORK_BATCH_SIZE = 100;
         size_t lastPoll;
         size_t i = 0;
         do
@@ -275,7 +274,7 @@ VirtualClock::crank(bool block)
             // May add work to mDelayedExecutionQueue.
             lastPoll = mIOContext.poll_one();
             nWorkDone += lastPoll;
-        } while (lastPoll != 0 && ++i < WORK_BATCH_SIZE);
+        } while (lastPoll != 0 && ++i < batchSize);
 
         nWorkDone -= nRealTimerCancelEvents;
 
