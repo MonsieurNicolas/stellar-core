@@ -6,7 +6,10 @@
 
 #include "util/Logging.h"
 #include <chrono>
+#include <util/format.h>
 
+namespace stellar
+{
 class LogSlowExecution
 {
   public:
@@ -20,12 +23,14 @@ class LogSlowExecution
     LogSlowExecution(
         std::string eventName, Mode mode = Mode::AUTOMATIC_RAII,
         std::string message = "took",
-        std::chrono::milliseconds threshold = std::chrono::seconds(1))
+        std::chrono::milliseconds threshold = std::chrono::seconds(1),
+        el::Level logLevel = el::Level::Info)
         : mStart(std::chrono::system_clock::now())
         , mName(std::move(eventName))
         , mMode(mode)
         , mMessage(std::move(message))
-        , mThreshold(threshold){};
+        , mThreshold(threshold)
+        , mLogLevel(logLevel){};
 
     ~LogSlowExecution()
     {
@@ -43,9 +48,13 @@ class LogSlowExecution
             finish - mStart);
         auto tooSlow = elapsed > mThreshold;
 
-        CLOG_IF(tooSlow, INFO, "Perf")
-            << "'" << mName << "' " << mMessage << " "
-            << static_cast<float>(elapsed.count()) / 1000 << " s";
+        if (tooSlow && mLogLevel >= Logging::getLogLevel("Perf"))
+        {
+            std::string m =
+                fmt::format("'{}' {} {} s", mName, mMessage,
+                            static_cast<float>(elapsed.count()) / 1000);
+            CLOG(INFO, "Perf") << m;
+        }
         return elapsed;
     }
 
@@ -55,4 +64,6 @@ class LogSlowExecution
     Mode mMode;
     std::string mMessage;
     std::chrono::milliseconds mThreshold;
+    el::Level mLogLevel;
 };
+}

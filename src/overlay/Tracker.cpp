@@ -29,7 +29,8 @@ Tracker::Tracker(Application& app, Hash const& hash, AskPeer& askPeer)
     , mItemHash(hash)
     , mTryNextPeer(
           app.getOverlayManager().getOverlayMetrics().mItemFetcherNextPeer)
-    , mFetchTime("fetch-" + hexAbbrev(hash), LogSlowExecution::Mode::MANUAL)
+    , mFetchTime("fetch-" + hexAbbrev(hash), LogSlowExecution::Mode::MANUAL,
+                 "took", std::chrono::seconds(1), el::Level::Debug)
 {
     assert(mAskPeer);
 }
