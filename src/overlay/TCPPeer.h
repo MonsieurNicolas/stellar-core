@@ -24,7 +24,7 @@ class TCPPeer : public Peer
 {
   public:
     typedef asio::buffered_stream<asio::ip::tcp::socket> SocketType;
-    static constexpr size_t BUFSZ = 0x40000; // 256KB
+    static constexpr size_t BUFSZ = 1 * 1024;
 
   private:
     std::shared_ptr<SocketType> mSocket;
