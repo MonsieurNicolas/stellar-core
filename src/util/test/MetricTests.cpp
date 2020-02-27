@@ -150,6 +150,15 @@ class ExpDecayTester
                           Args... args)
     {
         Dist dist(std::forward<Args>(args)...);
+        // see if we need to remove obsolete samples
+        medida::Clock::time_point cutOff = mTimestamp + nSamples * timeStep;
+        auto toRemoveIt = std::lower_bound(
+            mSamples.begin(), mSamples.end(), Sample(0, cutOff),
+            [&](Sample const& l, Sample const& r) {
+                return l.mTimeStamp < r.mTimeStamp;
+            });
+        mSamples.erase(mSamples.begin(), toRemoveIt);
+
         // how many samples to keep
         size_t keepSamples =
             std::chrono::milliseconds(sampleCutoff).count() / timeStep.count() +
@@ -192,13 +201,13 @@ class ExpDecayTester
         addSamplesAtFrequency<uniform_u64>(numSamples, freq, low, high);
     }
 
-    // Adds 10 minutes @ 0.2hz of uniform samples from [low, high]
+    // Adds 0.2hz of uniform samples from [low, high]
     void
-    addUniformSamplesAtLowFrequencyShort(uint64_t low, uint64_t high)
+    addUniformSamplesAtLowFrequencyShort(std::chrono::seconds const& dur,
+                                         uint64_t low, uint64_t high)
     {
         auto freq = std::chrono::milliseconds(5000);
-        uint64_t const n =
-            std::chrono::milliseconds(std::chrono::minutes(10)) / freq;
+        uint64_t const n = std::chrono::milliseconds(dur) / freq;
         addSamplesAtFrequency<uniform_u64>(n, freq, low, high);
     }
 
@@ -256,7 +265,7 @@ class ExpDecayTester
     computePercentiles(std::chrono::milliseconds const windowSize,
                        bool skewed) const
     {
-        // dumpData();
+        //dumpData();
 
         auto windowEndTime = mSamples.back().mTimeStamp;
         auto windowStartIt = std::lower_bound(
@@ -264,17 +273,13 @@ class ExpDecayTester
             [](Sample const& v, medida::Clock::time_point const& t) {
                 return v.mTimeStamp < t;
             });
-        std::vector<double> data;
-        uint64_t last = 0;
+        std::vector<medida::stats::WeightedValue> data;
         data.reserve(mSamples.size());
         for (auto it = windowStartIt; it != mSamples.end(); it++)
         {
             auto const& cur = it->mData;
-            if (data.empty() || cur != last)
-            {
-                data.emplace_back(double(cur));
-                last = cur;
-            }
+            data.emplace_back(
+                medida::stats::WeightedValue{double(cur), 1.0});
         }
         std::sort(data.begin(), data.end());
         medida::stats::Snapshot snp(data);
@@ -302,10 +307,11 @@ medida::stats::Snapshot
 sampleFrom(Args... args)
 {
     Dist dist(std::forward<Args>(args)...);
-    std::vector<double> sample;
+    std::vector<medida::stats::WeightedValue> sample;
     for (size_t i = 0; i < 10000; ++i)
     {
-        sample.emplace_back(dist(stellar::gRandomEngine));
+        sample.emplace_back(
+            medida::stats::WeightedValue{dist(stellar::gRandomEngine), 1.0});
     }
     return medida::stats::Snapshot(sample);
 }
@@ -368,7 +374,7 @@ TEST_CASE("exp decay percentiles - uniform at low frequency short",
           "[expdecay][medida_math]")
 {
     ExpDecayTester et;
-    et.addUniformSamplesAtLowFrequencyShort(1, 100);
+    et.addUniformSamplesAtLowFrequencyShort(std::chrono::minutes(10), 1, 100);
     et.checkPercentiles(false);
 }
 
@@ -424,4 +430,17 @@ TEST_CASE("exp decay percentiles - gamma high then uniform medium",
     et.checkPercentiles(true);
     et.addUniformSamplesAtMediumFrequency(1, 100);
     et.checkPercentiles(false);
+}
+
+TEST_CASE("exp decay percentiles - slow spike", "[expdecay][medida_math]")
+{
+    ExpDecayTester et;
+    et.addUniformSamplesAtLowFrequencyShort(std::chrono::minutes(2), 1, 100);
+    et.checkPercentiles(true);
+    // inject a spike
+    et.addUniformSamplesAtLowFrequencyShort(std::chrono::seconds(30), 1000,
+                                            10000);
+    // inject more samples, spike should get ignored
+    et.addUniformSamplesAtLowFrequencyShort(std::chrono::minutes(2), 1, 100);
+    et.checkPercentiles(true);
 }
