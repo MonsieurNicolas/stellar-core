@@ -6,68 +6,121 @@
 #include "medida/histogram.h"
 #include "medida/stats/exp_decay_sample.h"
 #include "medida/stats/snapshot.h"
+#include "util/Logging.h"
+#include "util/Math.h"
+#include <iostream>
 #include <random>
+#include <sstream>
 
 // These tests just check that medida's math is roughly sensible.
+namespace
+{
 
 using uniform_dbl = std::uniform_real_distribution<double>;
+using gamma_dbl = std::gamma_distribution<double>;
 using uniform_u64 = std::uniform_int_distribution<uint64_t>;
 
-/*****************************************************************
- * Snapshot / percentile tests
- *****************************************************************/
-
-template <typename Dist, typename... Args>
-medida::stats::Snapshot
-sampleFrom(Args... args)
+struct Percentiles
 {
-    std::mt19937_64 rng;
-    Dist dist(std::forward<Args>(args)...);
-    std::vector<double> sample;
-    for (size_t i = 0; i < 10000; ++i)
+    Approx mP50;
+    Approx mP75;
+    Approx mP95;
+    Approx mP98;
+    Approx mP99;
+    Approx mP999;
+    Percentiles(double p50, double p75, double p95, double p98, double p99,
+                double p999, bool flatMargin = true)
+        : mP50(p50), mP75(p75), mP95(p95), mP98(p98), mP99(p99), mP999(p999)
     {
-        sample.emplace_back(dist(rng));
+        if (flatMargin)
+        {
+            setFlatMargin(p999 * 0.075);
+        }
+        else
+        {
+            setSkewMargin(p999 * 0.075);
+        }
     }
-    return medida::stats::Snapshot(sample);
-}
+    void
+    setFlatMargin(double m)
+    {
+        mP50.margin(m);
+        mP75.margin(m);
+        mP95.margin(m);
+        mP98.margin(m);
+        mP99.margin(m);
+        mP999.margin(m);
+    }
+    void
+    setSkewMargin(double m)
+    {
+        // When dealing with gamma distributions we've got quite a long tail, so
+        // the p9x values all need more leeway.
+        mP50.margin(m);
+        mP75.margin(m);
+        mP95.margin(m);
+        mP98.margin(m * 2);
+        mP99.margin(m * 4);
+        mP999.margin(m * 16);
+    }
+    void
+    checkAgainst(medida::stats::Snapshot const& snap) const
+    {
+        double calc50 = snap.getMedian();
+        double calc75 = snap.get75thPercentile();
+        double calc95 = snap.get95thPercentile();
+        double calc98 = snap.get98thPercentile();
+        double calc99 = snap.get99thPercentile();
+        double calc999 = snap.get999thPercentile();
+        CHECK(calc50 == mP50);
+        CHECK(calc75 == mP75);
+        CHECK(calc95 == mP95);
+        CHECK(calc98 == mP98);
+        CHECK(calc99 == mP99);
+        CHECK(calc999 == mP999);
+        if (calc50 != mP50 || calc75 != mP75 || calc95 != mP95 ||
+            calc98 != mP98 || calc99 != mP99 || calc999 != mP999)
+        {
+            std::ostringstream oss;
+            bool first = true;
+            for (auto dbl : snap.getValues())
+            {
+                if (first)
+                {
+                    first = false;
+                }
+                else
+                {
+                    oss << ", ";
+                }
+                oss << dbl;
+            }
+            LOG(ERROR) << "failing samples: " << oss.str();
+        }
+    }
+};
 
-void
-checkPercentiles(medida::stats::Snapshot const& snap, Approx const& e50,
-                 Approx const& e75, Approx const& e95, Approx const& e98,
-                 Approx const& e99, Approx const& e999)
-{
-    CHECK(snap.getMedian() == e50);
-    CHECK(snap.get75thPercentile() == e75);
-    CHECK(snap.get95thPercentile() == e95);
-    CHECK(snap.get98thPercentile() == e98);
-    CHECK(snap.get99thPercentile() == e99);
-    CHECK(snap.get999thPercentile() == e999);
-}
+Percentiles const constant_23_pct(23.0, 23.0, 23.0, 23.0, 23.0, 23.0);
 
-TEST_CASE("percentile calculation - constant", "[percentile]")
-{
-    auto snap = sampleFrom<uniform_dbl>(1.0, 100.0);
-    Approx e50 = Approx(50.0).margin(3);
-    Approx e75 = Approx(75.0).margin(2);
-    Approx e95 = Approx(95.0).margin(1);
-    Approx e98 = Approx(98.0).margin(1);
-    Approx e99 = Approx(99.0).margin(1);
-    Approx e999 = Approx(99.9).margin(0.1);
-    checkPercentiles(snap, e50, e75, e95, e98, e99, e999);
-}
+Percentiles const uniform_1_100_pct(50.0, 75.0, 95.0, 98.0, 99.0, 99.9);
 
-/*****************************************************************
- * ExpDecaySample tests, time-based
- *****************************************************************/
+// Assuming the R interpreter can correctly calculate percentiles:
+//
+// $ R -q -e 'qgamma(c(0.5, 0.75, 0.95, 0.98, 0.99, 0.999), 4, scale=100)'
+// > qgamma(c(0.5, 0.75, 0.95, 0.98, 0.99, 0.999), 4, scale=100)
+// [1]  367.2061  510.9427  775.3657  908.4115 1004.5118 1306.2241
+Percentiles const gamma_4_100_pct(367.2061, 510.9427, 775.3657, 908.4115,
+                                  1004.5118, 1306.2241,
+                                  /*flatMargin=*/false);
 
 class ExpDecayTester
 {
     // These are private constants in the implementation of Histogram,
     // but we want to reuse them here for testing ExpDecaySample.
+    static size_t constexpr numSamples = 10000;
     static uint32_t constexpr medidaExpDecayReservoirSize = 1028;
     static double constexpr medidaExpDecayAlpha = 0.015;
     medida::stats::ExpDecaySample mExpDecaySample;
-    std::mt19937_64 mRng;
     medida::Clock::time_point mTimestamp;
 
   public:
@@ -84,87 +137,178 @@ class ExpDecayTester
         Dist dist(std::forward<Args>(args)...);
         for (size_t i = 0; i < nSamples; ++i)
         {
-            mExpDecaySample.Update(dist(mRng), mTimestamp);
+            uint64_t sample =
+                static_cast<uint64_t>(dist(stellar::gRandomEngine));
+            mExpDecaySample.Update(sample, mTimestamp);
             mTimestamp += timeStep;
         }
     }
+
     // Adds 10 seconds @ 1khz of uniform samples from [low, high]
     void
     addUniformSamplesAtHighFrequency(uint64_t low, uint64_t high)
     {
         auto freq = std::chrono::milliseconds(1);
-        addSamplesAtFrequency<uniform_u64>(10000, freq, low, high);
+        addSamplesAtFrequency<uniform_u64>(numSamples, freq, low, high);
     }
+
     // Adds 5 minutes @ 30hz of uniform samples from [low, high]
     void
     addUniformSamplesAtMediumFrequency(uint64_t low, uint64_t high)
     {
         auto freq = std::chrono::milliseconds(33);
-        addSamplesAtFrequency<uniform_u64>(10000, freq, low, high);
+        addSamplesAtFrequency<uniform_u64>(numSamples, freq, low, high);
     }
+
     // Adds 13 hours @ 0.2hz of uniform samples from [low, high]
     void
     addUniformSamplesAtLowFrequency(uint64_t low, uint64_t high)
     {
         auto freq = std::chrono::milliseconds(5000);
-        addSamplesAtFrequency<uniform_u64>(10000, freq, low, high);
+        addSamplesAtFrequency<uniform_u64>(numSamples, freq, low, high);
     }
+
+    // Adds 10 seconds @ 1khz of gamma(shape,scale) samples
+    void
+    addGammaSamplesAtHighFrequency(double shape, double scale)
+    {
+        auto freq = std::chrono::milliseconds(1);
+        addSamplesAtFrequency<gamma_dbl>(numSamples, freq, shape, scale);
+    }
+
+    // Adds 5 minutes @ 30hz of gamma(shape,scale) samples
+    void
+    addGammaSamplesAtMediumFrequency(double shape, double scale)
+    {
+        auto freq = std::chrono::milliseconds(33);
+        addSamplesAtFrequency<gamma_dbl>(numSamples, freq, shape, scale);
+    }
+
+    // Adds 13 hours @ 0.2hz of gamma(shape,scale) samples
+    void
+    addGammaSamplesAtLowFrequency(double shape, double scale)
+    {
+        auto freq = std::chrono::milliseconds(5000);
+        addSamplesAtFrequency<gamma_dbl>(numSamples, freq, shape, scale);
+    }
+
     medida::stats::Snapshot
     getSnapshot()
     {
         return mExpDecaySample.MakeSnapshot();
     }
-    void
-    checkPercentiles(Approx const& e50, Approx const& e75, Approx const& e95,
-                     Approx const& e98, Approx const& e99, Approx const& e999)
-    {
-        ::checkPercentiles(getSnapshot(), e50, e75, e95, e98, e99, e999);
-    }
 };
+}
 
-TEST_CASE("exp decay percentiles - constant", "[expdecay]")
+/*****************************************************************
+ * Snapshot / percentile tests
+ *****************************************************************/
+
+template <typename Dist, typename... Args>
+medida::stats::Snapshot
+sampleFrom(Args... args)
+{
+    Dist dist(std::forward<Args>(args)...);
+    std::vector<double> sample;
+    for (size_t i = 0; i < 10000; ++i)
+    {
+        sample.emplace_back(dist(stellar::gRandomEngine));
+    }
+    return medida::stats::Snapshot(sample);
+}
+
+TEST_CASE("percentile calculation - constant", "[percentile][medida_math]")
+{
+    auto snap = sampleFrom<uniform_dbl>(23.0, 23.0);
+    constant_23_pct.checkAgainst(snap);
+}
+
+TEST_CASE("percentile calculation - uniform", "[percentile][medida_math]")
+{
+    auto snap = sampleFrom<uniform_dbl>(1.0, 100.0);
+    uniform_1_100_pct.checkAgainst(snap);
+}
+
+TEST_CASE("percentile calculation - gamma", "[percentile][medida_math]")
+{
+
+    auto snap = sampleFrom<gamma_dbl>(4.0, 100.0);
+    gamma_4_100_pct.checkAgainst(snap);
+}
+
+/*****************************************************************
+ * ExpDecaySample tests, time-based
+ *****************************************************************/
+
+TEST_CASE("exp decay percentiles - constant", "[expdecay][medida_math]")
 {
     ExpDecayTester et;
     et.addUniformSamplesAtHighFrequency(23, 23);
-    Approx e50(23.0), e75(23.0), e95(23.0), e98(23.0), e99(23.0), e999(23.0);
-    et.checkPercentiles(e50, e75, e95, e98, e99, e999);
+    constant_23_pct.checkAgainst(et.getSnapshot());
 }
 
-TEST_CASE("exp decay percentiles - uniform at high frequency", "[expdecay]")
+TEST_CASE("exp decay percentiles - uniform at high frequency",
+          "[expdecay][medida_math]")
 {
     ExpDecayTester et;
     et.addUniformSamplesAtHighFrequency(1, 100);
-    Approx e50 = Approx(50.0).margin(5);
-    Approx e75 = Approx(75.0).margin(4);
-    Approx e95 = Approx(95.0).margin(3);
-    Approx e98 = Approx(98.0).margin(2);
-    Approx e99 = Approx(99.0).margin(1);
-    Approx e999 = Approx(99.9).margin(0.1);
-    et.checkPercentiles(e50, e75, e95, e98, e99, e999);
+    uniform_1_100_pct.checkAgainst(et.getSnapshot());
 }
 
-TEST_CASE("exp decay percentiles - uniform at medium frequency", "[expdecay]")
+TEST_CASE("exp decay percentiles - uniform at medium frequency",
+          "[expdecay][medida_math]")
 {
     ExpDecayTester et;
     et.addUniformSamplesAtMediumFrequency(1, 100);
-    Approx e50 = Approx(50.0).margin(5);
-    Approx e75 = Approx(75.0).margin(4);
-    Approx e95 = Approx(95.0).margin(3);
-    Approx e98 = Approx(98.0).margin(2);
-    Approx e99 = Approx(99.0).margin(1);
-    Approx e999 = Approx(99.9).margin(0.1);
-    et.checkPercentiles(e50, e75, e95, e98, e99, e999);
+    uniform_1_100_pct.checkAgainst(et.getSnapshot());
 }
 
-TEST_CASE("exp decay percentiles - uniform at low frequency", "[expdecay]")
+TEST_CASE("exp decay percentiles - uniform at low frequency",
+          "[expdecay][medida_math]")
 {
     ExpDecayTester et;
     et.addUniformSamplesAtLowFrequency(1, 100);
-    Approx e50 = Approx(50.0).margin(5);
-    Approx e75 = Approx(75.0).margin(4);
-    Approx e95 = Approx(95.0).margin(3);
-    Approx e98 = Approx(98.0).margin(2);
-    Approx e99 = Approx(99.0).margin(1);
-    Approx e999 = Approx(99.9).margin(0.1);
-    et.checkPercentiles(e50, e75, e95, e98, e99, e999);
+    uniform_1_100_pct.checkAgainst(et.getSnapshot());
+}
+
+TEST_CASE("exp decay percentiles - gamma at high frequency",
+          "[expdecay][medida_math]")
+{
+    ExpDecayTester et;
+    et.addGammaSamplesAtHighFrequency(4.0, 100.0);
+    gamma_4_100_pct.checkAgainst(et.getSnapshot());
+}
+
+TEST_CASE("exp decay percentiles - gamma at medium frequency",
+          "[expdecay][medida_math]")
+{
+    ExpDecayTester et;
+    et.addGammaSamplesAtMediumFrequency(4.0, 100.0);
+    gamma_4_100_pct.checkAgainst(et.getSnapshot());
+}
+
+TEST_CASE("exp decay percentiles - gamma at low frequency",
+          "[expdecay][medida_math]")
+{
+    ExpDecayTester et;
+    et.addGammaSamplesAtLowFrequency(4.0, 100.0);
+    gamma_4_100_pct.checkAgainst(et.getSnapshot());
+}
+
+TEST_CASE("exp decay percentiles - gamma high then uniform medium",
+          "[expdecay][medida_math]")
+{
+    // The point here is to test that earlier samples get flushed out.
+    ExpDecayTester et;
+    et.addGammaSamplesAtHighFrequency(4.0, 100.0);
+
+    // We run with the uniform state for 20 minutes. After 5 it's _mostly_
+    // flushed out, but there are enough residual samples for the test to
+    // fail. After 10 and 15 there are typically only 0 or 1 samples, but
+    // again, we want this test to pass! By 20 it seems almost always done.
+    et.addUniformSamplesAtMediumFrequency(1, 100);
+    et.addUniformSamplesAtMediumFrequency(1, 100);
+    et.addUniformSamplesAtMediumFrequency(1, 100);
+    et.addUniformSamplesAtMediumFrequency(1, 100);
+    uniform_1_100_pct.checkAgainst(et.getSnapshot());
 }
