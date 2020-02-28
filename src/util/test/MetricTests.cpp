@@ -307,10 +307,11 @@ medida::stats::Snapshot
 sampleFrom(Args... args)
 {
     Dist dist(std::forward<Args>(args)...);
-    std::vector<double> sample;
+    std::vector<medida::stats::WeightedValue> sample;
     for (size_t i = 0; i < 10000; ++i)
     {
-        sample.emplace_back(dist(stellar::gRandomEngine));
+        sample.emplace_back(
+            medida::stats::WeightedValue{dist(stellar::gRandomEngine), 1.0});
     }
     return medida::stats::Snapshot(sample);
 }
