@@ -1090,6 +1090,29 @@ TEST_CASE("ballot protocol core5", "[scp][ballotprotocol]")
                             verifyConfirm(scp.mEnvs[6], v0SecretKey, qSetHash0,
                                           0, 3, B3, 2, 2);
                         }
+                        SECTION("higher counter prepared prime")
+                        {
+                            recvVBlocking(
+                                makePrepareGen(qSetHash, A3, &B3, 0, 2, &A3));
+                            REQUIRE(scp.mEnvs.size() == 6);
+                            // v-blocking
+                            //   confirms prepared B3 and A3
+                            //      -> p=B3 ; p'=A3
+                            //   on ballot counter 3
+                            //       (h still = A2)
+                            //      -> update b=A3
+                            verifyPrepare(scp.mEnvs[5], v0SecretKey, qSetHash0,
+                                          0, A3, &B3, 0, 2, &A3);
+                            REQUIRE(!scp.hasBallotTimer());
+                            recvQuorumChecksEx(
+                                makePrepareGen(qSetHash, A3, &B3, 0, 2, &A3),
+                                true, true, true);
+                            REQUIRE(scp.mEnvs.size() == 7);
+                            // quorum
+                            //   -> h = B3, c = B3, b = B3
+                            verifyPrepare(scp.mEnvs[6], v0SecretKey, qSetHash0,
+                                          0, B3, &B3, 3, 3, &A3);
+                        }
                     }
                 }
                 SECTION("Confirm prepared mixed")
@@ -2407,12 +2430,59 @@ TEST_CASE("ballot protocol core3", "[scp][ballotprotocol]")
     SCPBallot B3 = B2;
     B3.counter++;
 
-    REQUIRE(scp.bumpState(0, aValue));
-    REQUIRE(scp.mEnvs.size() == 1);
-    REQUIRE(!scp.hasBallotTimer());
-
-    SECTION("prepared B1 (quorum votes B1)")
+    SECTION("third party timing")
     {
+        SIMULATION_CREATE_NODE(TP);
+        TestSCP scpTP(vTPSecretKey.getPublicKey(), qSet);
+        scpTP.storeQuorumSet(std::make_shared<SCPQuorumSet>(qSet));
+        uint256 qSetHashTP = scpTP.mSCP.getLocalNode()->getQuorumSetHash();
+
+        scpTP.receiveEnvelope(
+            makePrepare(v1SecretKey, qSetHash, 0, B2, &A2, 0, 1, &B2));
+        scpTP.receiveEnvelope(
+            makePrepare(v2SecretKey, qSetHash, 0, B1, &B1, 1, 1));
+
+        REQUIRE(scpTP.mEnvs.size() == 1);
+        verifyPrepare(scpTP.mEnvs[0], vTPSecretKey, qSetHashTP, 0, B1, &B1, 1,
+                      1);
+
+        scpTP.receiveEnvelope(
+            makePrepare(v0SecretKey, qSetHash, 0, B2, &A2, 0, 1, &B2));
+
+        REQUIRE(scpTP.mEnvs.size() == 2);
+        verifyPrepare(scpTP.mEnvs[1], vTPSecretKey, qSetHashTP, 0, A2, &A2, 2,
+                      2, &B2);
+    }
+    SECTION("prepared B1")
+    {
+        // starts with bValue (smallest)
+        REQUIRE(scp.bumpState(0, bValue));
+        REQUIRE(scp.mEnvs.size() == 1);
+
+        // setup
+        recvQuorumChecks(makePrepareGen(qSetHash, B1, &B1, 0, 1), false, false);
+        REQUIRE(scp.mEnvs.size() == 2);
+        verifyPrepare(scp.mEnvs[1], v0SecretKey, qSetHash0, 0, B1, &B1, 1, 1);
+
+        // now, receive bumped votes
+        recvQuorumChecks(makePrepareGen(qSetHash, B2, &A2, 0, 1, &B2), true,
+                         true);
+        REQUIRE(scp.mEnvs.size() == 3);
+        // p=A2, p'=B2 (1)
+        // computed_h = A2 (2)
+        //   does not update h as b < computed_h
+        // v-blocking ahead -> b = computed_h = A2
+        // h = A2 (2) (now possible)
+        // c = 0 (1), c = A2 (3)
+        verifyPrepare(scp.mEnvs[2], v0SecretKey, qSetHash0, 0, A2, &A2, 2, 2,
+                      &B2);
+    }
+    SECTION("prepared B1 (quorum votes B1) local aValue")
+    {
+        REQUIRE(scp.bumpState(0, aValue));
+        REQUIRE(scp.mEnvs.size() == 1);
+        REQUIRE(!scp.hasBallotTimer());
+
         scp.bumpTimerOffset();
         recvQuorumChecks(makePrepareGen(qSetHash, B1), true, true);
         REQUIRE(scp.mEnvs.size() == 2);
