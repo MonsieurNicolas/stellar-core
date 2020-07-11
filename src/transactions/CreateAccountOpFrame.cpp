@@ -110,7 +110,7 @@ CreateAccountOpFrame::doCheckValid(uint32_t ledgerVersion)
 
 void
 CreateAccountOpFrame::insertLedgerKeysToPrefetch(
-    std::unordered_set<LedgerKey>& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const
 {
     keys.emplace(accountKey(mCreateAccount.destination));
 }

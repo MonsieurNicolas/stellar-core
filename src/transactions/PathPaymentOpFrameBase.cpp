@@ -28,7 +28,7 @@ PathPaymentOpFrameBase::getDestID() const
 
 void
 PathPaymentOpFrameBase::insertLedgerKeysToPrefetch(
-    std::unordered_set<LedgerKey>& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const
 {
     auto destID = getDestID();
     keys.emplace(accountKey(destID));

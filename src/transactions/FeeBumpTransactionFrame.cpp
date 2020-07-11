@@ -337,7 +337,7 @@ FeeBumpTransactionFrame::getSourceID() const
 
 void
 FeeBumpTransactionFrame::insertKeysForFeeProcessing(
-    std::unordered_set<LedgerKey>& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const
 {
     keys.emplace(accountKey(getFeeSourceID()));
     mInnerTx->insertKeysForFeeProcessing(keys);
@@ -345,7 +345,7 @@ FeeBumpTransactionFrame::insertKeysForFeeProcessing(
 
 void
 FeeBumpTransactionFrame::insertKeysForTxApply(
-    std::unordered_set<LedgerKey>& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const
 {
     mInnerTx->insertKeysForTxApply(keys);
 }

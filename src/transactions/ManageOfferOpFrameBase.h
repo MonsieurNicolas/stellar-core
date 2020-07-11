@@ -41,7 +41,8 @@ class ManageOfferOpFrameBase : public OperationFrame
 
     bool doApply(AbstractLedgerTxn& lsOuter) override;
     void insertLedgerKeysToPrefetch(
-        std::unordered_set<LedgerKey>& keys) const override;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const override;
 
     virtual bool isAmountValid() const = 0;
     virtual bool isDeleteOffer() const = 0;

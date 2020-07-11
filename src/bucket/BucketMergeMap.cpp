@@ -9,11 +9,11 @@
 
 namespace
 {
-std::unordered_set<stellar::Hash>
+std::unordered_set<stellar::Hash, std::RandHasher<stellar::Hash>>
 getMergeKeyHashes(stellar::MergeKey const& key)
 {
     ZoneScoped;
-    std::unordered_set<stellar::Hash> hashes;
+    std::unordered_set<stellar::Hash, std::RandHasher<stellar::Hash>> hashes;
     hashes.emplace(key.mInputCurrBucket);
     hashes.emplace(key.mInputSnapBucket);
     for (auto const& in : key.mInputShadowBuckets)
@@ -41,11 +41,11 @@ BucketMergeMap::recordMerge(MergeKey const& input, Hash const& output)
     }
 }
 
-std::unordered_set<MergeKey>
+std::unordered_set<MergeKey, std::RandHasher<MergeKey>>
 BucketMergeMap::forgetAllMergesProducing(Hash const& outputBeingDropped)
 {
     ZoneScoped;
-    std::unordered_set<MergeKey> ret;
+    std::unordered_set<MergeKey, std::RandHasher<MergeKey>> ret;
     auto mergesProducingOutput =
         mOutputToMergeKey.equal_range(outputBeingDropped);
     for (auto mergeProducingOutput = mergesProducingOutput.first;

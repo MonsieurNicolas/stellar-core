@@ -23,11 +23,15 @@
 namespace stellar
 {
 
-std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
-populateLoadedEntries(std::unordered_set<LedgerKey> const& keys,
-                      std::vector<LedgerEntry> const& entries)
+std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                   std::RandHasher<LedgerKey>>
+populateLoadedEntries(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys,
+    std::vector<LedgerEntry> const& entries)
 {
-    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>> res;
+    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                       std::RandHasher<LedgerKey>>
+        res;
 
     for (auto const& le : entries)
     {
@@ -75,8 +79,7 @@ operator==(AssetPair const& lhs, AssetPair const& rhs)
 size_t
 AssetPairHash::operator()(AssetPair const& key) const
 {
-    std::hash<Asset> hashAsset;
-    return hashAsset(key.buying) ^ (hashAsset(key.selling) << 1);
+    return mAssetHasher(key.buying) ^ (mAssetHasher(key.selling) << 1);
 }
 
 // Implementation of AbstractLedgerTxnParent --------------------------------
@@ -611,13 +614,13 @@ LedgerTxn::Impl::eraseWithoutLoading(LedgerKey const& key)
     mConsistency = LedgerTxnConsistency::EXTRA_DELETES;
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxn::getAllOffers()
 {
     return getImpl()->getAllOffers();
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxn::Impl::getAllOffers()
 {
     auto offers = mParent.getAllOffers();
@@ -1132,14 +1135,14 @@ LedgerTxn::Impl::getNewestVersion(LedgerKey const& key) const
     return mParent.getNewestVersion(key);
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxn::getOffersByAccountAndAsset(AccountID const& account,
                                       Asset const& asset)
 {
     return getImpl()->getOffersByAccountAndAsset(account, asset);
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxn::Impl::getOffersByAccountAndAsset(AccountID const& account,
                                             Asset const& asset)
 {
@@ -1551,13 +1554,15 @@ LedgerTxn::Impl::getPrefetchHitRate() const
 }
 
 uint32_t
-LedgerTxn::prefetch(std::unordered_set<LedgerKey> const& keys)
+LedgerTxn::prefetch(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
 {
     return getImpl()->prefetch(keys);
 }
 
 uint32_t
-LedgerTxn::Impl::prefetch(std::unordered_set<LedgerKey> const& keys)
+LedgerTxn::Impl::prefetch(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
 {
     return mParent.prefetch(keys);
 }
@@ -2244,25 +2249,27 @@ LedgerTxnRoot::dropTrustLines()
 }
 
 uint32_t
-LedgerTxnRoot::prefetch(std::unordered_set<LedgerKey> const& keys)
+LedgerTxnRoot::prefetch(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
 {
     return mImpl->prefetch(keys);
 }
 
 uint32_t
-LedgerTxnRoot::Impl::prefetch(std::unordered_set<LedgerKey> const& keys)
+LedgerTxnRoot::Impl::prefetch(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
 {
     ZoneScoped;
     uint32_t total = 0;
 
-    std::unordered_set<LedgerKey> accounts;
-    std::unordered_set<LedgerKey> offers;
-    std::unordered_set<LedgerKey> trustlines;
-    std::unordered_set<LedgerKey> data;
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> accounts;
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> offers;
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> trustlines;
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> data;
 
     auto cacheResult =
-        [&](std::unordered_map<LedgerKey,
-                               std::shared_ptr<LedgerEntry const>> const& res) {
+        [&](std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                               std::RandHasher<LedgerKey>> const& res) {
             for (auto const& item : res)
             {
                 putInEntryCache(item.first, item.second, LoadType::PREFETCH);
@@ -2270,13 +2277,14 @@ LedgerTxnRoot::Impl::prefetch(std::unordered_set<LedgerKey> const& keys)
             }
         };
 
-    auto insertIfNotLoaded = [&](std::unordered_set<LedgerKey>& keys,
-                                 LedgerKey const& key) {
-        if (!mEntryCache.exists(key, false))
-        {
-            keys.insert(key);
-        }
-    };
+    auto insertIfNotLoaded =
+        [&](std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys,
+            LedgerKey const& key) {
+            if (!mEntryCache.exists(key, false))
+            {
+                keys.insert(key);
+            }
+        };
 
     for (auto const& key : keys)
     {
@@ -2349,13 +2357,13 @@ LedgerTxnRoot::Impl::getPrefetchHitRate() const
            (mPrefetchMisses + mPrefetchHits);
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxnRoot::getAllOffers()
 {
     return mImpl->getAllOffers();
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxnRoot::Impl::getAllOffers()
 {
     ZoneScoped;
@@ -2376,7 +2384,8 @@ LedgerTxnRoot::Impl::getAllOffers()
             "unknown fatal error when getting all offers from LedgerTxnRoot");
     }
 
-    std::unordered_map<LedgerKey, LedgerEntry> offersByKey(offers.size());
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
+        offersByKey(offers.size());
     for (auto const& offer : offers)
     {
         offersByKey.emplace(LedgerEntryKey(offer), offer);
@@ -2478,7 +2487,7 @@ LedgerTxnRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
                                "from LedgerTxnRoot");
         }
 
-        std::unordered_set<LedgerKey> toPrefetch;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> toPrefetch;
         for (auto iter = newOfferIter; iter != offers.cend(); ++iter)
         {
             putInEntryCache(LedgerEntryKey(*iter),
@@ -2507,14 +2516,14 @@ LedgerTxnRoot::Impl::getBestOffer(Asset const& buying, Asset const& selling,
     return res;
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxnRoot::getOffersByAccountAndAsset(AccountID const& account,
                                           Asset const& asset)
 {
     return mImpl->getOffersByAccountAndAsset(account, asset);
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 LedgerTxnRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
                                                 Asset const& asset)
 {
@@ -2536,7 +2545,8 @@ LedgerTxnRoot::Impl::getOffersByAccountAndAsset(AccountID const& account,
                            "and asset from LedgerTxnRoot");
     }
 
-    std::unordered_map<LedgerKey, LedgerEntry> res(offers.size());
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>> res(
+        offers.size());
     for (auto const& offer : offers)
     {
         res.emplace(LedgerEntryKey(offer), offer);

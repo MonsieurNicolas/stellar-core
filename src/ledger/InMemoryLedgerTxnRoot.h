@@ -26,13 +26,14 @@ class InMemoryLedgerTxnRoot : public AbstractLedgerTxnParent
     void commitChild(EntryIterator iter, LedgerTxnConsistency cons) override;
     void rollbackChild() override;
 
-    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() override;
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
+    getAllOffers() override;
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling) override;
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  OfferDescriptor const& worseThan) override;
-    std::unordered_map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
     getOffersByAccountAndAsset(AccountID const& account,
                                Asset const& asset) override;
 
@@ -55,6 +56,8 @@ class InMemoryLedgerTxnRoot : public AbstractLedgerTxnParent
     void dropOffers() override;
     void dropTrustLines() override;
     double getPrefetchHitRate() const override;
-    uint32_t prefetch(std::unordered_set<LedgerKey> const& keys) override;
+    uint32_t prefetch(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        override;
 };
 }

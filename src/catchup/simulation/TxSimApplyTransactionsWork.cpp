@@ -401,7 +401,8 @@ TxSimApplyTransactionsWork::getNextLedgerFromHistoryArchive()
                                mResultHistory))
     {
         // Derive transaction apply order from the results
-        std::unordered_map<Hash, TransactionEnvelope> transactions;
+        std::unordered_map<Hash, TransactionEnvelope, std::RandHasher<Hash>>
+            transactions;
         for (auto const& tx : mTransactionHistory.txSet.txs)
         {
             auto txFrame = TransactionFrameBase::makeTransactionFromWire(

@@ -5,6 +5,7 @@
 // of this distribution or at http://www.apache.org/licenses/LICENSE-2.0
 
 #include "crypto/ShortHash.h"
+#include "util/Math.h"
 #include "xdr/Stellar-ledger.h"
 #include <functional>
 
@@ -100,6 +101,22 @@ template <> class hash<stellar::Asset>
         }
         }
         return res;
+    }
+};
+
+template <typename T> class RandHasher
+{
+    size_t mMixer{0};
+
+  public:
+    RandHasher()
+    {
+        mMixer = stellar::rand_uniform(0ULL, UINT64_MAX);
+    }
+    size_t
+    operator()(T const& t) const
+    {
+        return std::hash<T>()(t) ^ mMixer;
     }
 };
 }

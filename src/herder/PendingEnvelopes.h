@@ -5,6 +5,7 @@
 #include "lib/json/json.h"
 #include "lib/util/lrucache.hpp"
 #include "overlay/ItemFetcher.h"
+#include "ledger/LedgerHashUtils.h"
 #include <autocheck/function.hpp>
 #include <chrono>
 #include <map>
@@ -47,7 +48,9 @@ class PendingEnvelopes
     // recent quorum sets
     cache::lru_cache<Hash, SCPQuorumSetPtr> mQsetCache;
     // weak references to all known qsets
-    std::unordered_map<Hash, std::weak_ptr<SCPQuorumSet>> mKnownQSets;
+    std::unordered_map<Hash, std::weak_ptr<SCPQuorumSet>,
+                       std::RandHasher<Hash>>
+        mKnownQSets;
 
     ItemFetcher mTxSetFetcher;
     ItemFetcher mQuorumSetFetcher;
@@ -56,7 +59,8 @@ class PendingEnvelopes
     // recent txsets
     cache::lru_cache<Hash, TxSetFramCacheItem> mTxSetCache;
     // weak references to all known txsets
-    std::unordered_map<Hash, std::weak_ptr<TxSetFrame>> mKnownTxSets;
+    std::unordered_map<Hash, std::weak_ptr<TxSetFrame>, std::RandHasher<Hash>>
+        mKnownTxSets;
 
     bool mRebuildQuorum;
     QuorumTracker mQuorumTracker;

@@ -54,7 +54,8 @@ class TxSetFrame : public AbstractTxSetFrameForApply
                      std::vector<TransactionFrameBasePtr>& trimmed,
                      bool justCheck, uint64_t upperBoundCloseTimeOffset);
 
-    std::unordered_map<AccountID, AccountTransactionQueue>
+    std::unordered_map<AccountID, AccountTransactionQueue,
+                       std::RandHasher<AccountID>>
     buildAccountTxQueues();
     friend struct SurgeCompare;
 

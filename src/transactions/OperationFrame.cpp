@@ -229,7 +229,7 @@ OperationFrame::loadSourceAccount(AbstractLedgerTxn& ltx,
 
 void
 OperationFrame::insertLedgerKeysToPrefetch(
-    std::unordered_set<LedgerKey>& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const
 {
     // Do nothing by default
     return;

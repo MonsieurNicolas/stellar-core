@@ -85,9 +85,11 @@ class FeeBumpTransactionFrame : public TransactionFrameBase
     AccountID getSourceID() const override;
 
     void insertKeysForFeeProcessing(
-        std::unordered_set<LedgerKey>& keys) const override;
-    void
-    insertKeysForTxApply(std::unordered_set<LedgerKey>& keys) const override;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const override;
+    void insertKeysForTxApply(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const override;
 
     void processFeeSeqNum(AbstractLedgerTxn& ltx, int64_t baseFee) override;
 

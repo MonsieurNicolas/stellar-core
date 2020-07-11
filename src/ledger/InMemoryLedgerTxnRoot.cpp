@@ -32,10 +32,11 @@ InMemoryLedgerTxnRoot::rollbackChild()
 {
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 InMemoryLedgerTxnRoot::getAllOffers()
 {
-    return std::unordered_map<LedgerKey, LedgerEntry>();
+    return std::unordered_map<LedgerKey, LedgerEntry,
+                              std::RandHasher<LedgerKey>>();
 }
 
 std::shared_ptr<LedgerEntry const>
@@ -51,11 +52,12 @@ InMemoryLedgerTxnRoot::getBestOffer(Asset const& buying, Asset const& selling,
     return nullptr;
 }
 
-std::unordered_map<LedgerKey, LedgerEntry>
+std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
 InMemoryLedgerTxnRoot::getOffersByAccountAndAsset(AccountID const& account,
                                                   Asset const& asset)
 {
-    return std::unordered_map<LedgerKey, LedgerEntry>();
+    return std::unordered_map<LedgerKey, LedgerEntry,
+                              std::RandHasher<LedgerKey>>();
 }
 
 LedgerHeader const&
@@ -123,7 +125,8 @@ InMemoryLedgerTxnRoot::getPrefetchHitRate() const
 }
 
 uint32_t
-InMemoryLedgerTxnRoot::prefetch(std::unordered_set<LedgerKey> const& keys)
+InMemoryLedgerTxnRoot::prefetch(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
 {
     return 0;
 }

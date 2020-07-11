@@ -84,7 +84,7 @@ class OperationFrame
         return mOperation;
     }
 
-    virtual void
-    insertLedgerKeysToPrefetch(std::unordered_set<LedgerKey>& keys) const;
+    virtual void insertLedgerKeysToPrefetch(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const;
 };
 }

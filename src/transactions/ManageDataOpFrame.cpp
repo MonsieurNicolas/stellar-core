@@ -110,7 +110,7 @@ ManageDataOpFrame::doCheckValid(uint32_t ledgerVersion)
 
 void
 ManageDataOpFrame::insertLedgerKeysToPrefetch(
-    std::unordered_set<LedgerKey>& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys) const
 {
     keys.emplace(dataKey(getSourceID(), mManageData.dataName));
 }

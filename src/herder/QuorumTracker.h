@@ -6,6 +6,7 @@
 
 #include "scp/SCP.h"
 #include "util/NonCopyable.h"
+#include "ledger/LedgerHashUtils.h"
 #include <unordered_map>
 
 namespace stellar
@@ -21,7 +22,8 @@ namespace stellar
 class QuorumTracker : public NonMovableOrCopyable
 {
   public:
-    using QuorumMap = std::unordered_map<NodeID, SCPQuorumSetPtr>;
+    using QuorumMap =
+        std::unordered_map<NodeID, SCPQuorumSetPtr, std::RandHasher<NodeID>>;
 
   private:
     SCP& mSCP;

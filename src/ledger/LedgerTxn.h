@@ -241,6 +241,7 @@ bool operator==(AssetPair const& lhs, AssetPair const& rhs);
 
 struct AssetPairHash
 {
+    std::RandHasher<Asset> mAssetHasher;
     size_t operator()(AssetPair const& key) const;
 };
 
@@ -268,7 +269,7 @@ struct LedgerTxnDelta
         LedgerHeader previous;
     };
 
-    std::unordered_map<LedgerKey, EntryDelta> entry;
+    std::unordered_map<LedgerKey, EntryDelta, std::RandHasher<LedgerKey>> entry;
     HeaderDelta header;
 };
 
@@ -368,13 +369,16 @@ class AbstractLedgerTxnParent
     // - getOffersByAccountAndAsset
     //     Get XDR for every offer owned by the specified account that is either
     //     buying or selling the specified asset.
-    virtual std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() = 0;
+    virtual std::unordered_map<LedgerKey, LedgerEntry,
+                               std::RandHasher<LedgerKey>>
+    getAllOffers() = 0;
     virtual std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling) = 0;
     virtual std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling,
                  OfferDescriptor const& worseThan) = 0;
-    virtual std::unordered_map<LedgerKey, LedgerEntry>
+    virtual std::unordered_map<LedgerKey, LedgerEntry,
+                               std::RandHasher<LedgerKey>>
     getOffersByAccountAndAsset(AccountID const& account,
                                Asset const& asset) = 0;
 
@@ -436,7 +440,9 @@ class AbstractLedgerTxnParent
     // This is purely advisory and can be a no-op, or do any level of actual
     // work, while still being correct. Will throw when called on anything other
     // than a (real or stub) root LedgerTxn.
-    virtual uint32_t prefetch(std::unordered_set<LedgerKey> const& keys) = 0;
+    virtual uint32_t
+    prefetch(std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const&
+                 keys) = 0;
 };
 
 // An abstraction for an object that is an AbstractLedgerTxnParent and has
@@ -605,7 +611,8 @@ class LedgerTxn final : public AbstractLedgerTxn
 
     void erase(LedgerKey const& key) override;
 
-    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() override;
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
+    getAllOffers() override;
 
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling) override;
@@ -619,7 +626,7 @@ class LedgerTxn final : public AbstractLedgerTxn
 
     LedgerTxnDelta getDelta() override;
 
-    std::unordered_map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
     getOffersByAccountAndAsset(AccountID const& account,
                                Asset const& asset) override;
 
@@ -671,7 +678,9 @@ class LedgerTxn final : public AbstractLedgerTxn
     void dropOffers() override;
     void dropTrustLines() override;
     double getPrefetchHitRate() const override;
-    uint32_t prefetch(std::unordered_set<LedgerKey> const& keys) override;
+    uint32_t prefetch(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        override;
 
 #ifdef BUILD_TESTS
     std::unordered_map<
@@ -712,7 +721,8 @@ class LedgerTxnRoot : public AbstractLedgerTxnParent
     void resetForFuzzer();
 #endif // FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
-    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers() override;
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
+    getAllOffers() override;
 
     std::shared_ptr<LedgerEntry const>
     getBestOffer(Asset const& buying, Asset const& selling) override;
@@ -720,7 +730,7 @@ class LedgerTxnRoot : public AbstractLedgerTxnParent
     getBestOffer(Asset const& buying, Asset const& selling,
                  OfferDescriptor const& worseThan) override;
 
-    std::unordered_map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
     getOffersByAccountAndAsset(AccountID const& account,
                                Asset const& asset) override;
 
@@ -734,7 +744,9 @@ class LedgerTxnRoot : public AbstractLedgerTxnParent
 
     void rollbackChild() override;
 
-    uint32_t prefetch(std::unordered_set<LedgerKey> const& keys) override;
+    uint32_t prefetch(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        override;
     double getPrefetchHitRate() const override;
 };
 }

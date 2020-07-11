@@ -194,11 +194,14 @@ struct SurgeCompare
     }
 };
 
-std::unordered_map<AccountID, TxSetFrame::AccountTransactionQueue>
+std::unordered_map<AccountID, TxSetFrame::AccountTransactionQueue,
+                   std::RandHasher<AccountID>>
 TxSetFrame::buildAccountTxQueues()
 {
     ZoneScoped;
-    std::unordered_map<AccountID, AccountTransactionQueue> actTxQueueMap;
+    std::unordered_map<AccountID, AccountTransactionQueue,
+                       std::RandHasher<AccountID>>
+        actTxQueueMap;
     for (auto& tx : mTransactions)
     {
         auto id = tx->getSourceID();
@@ -289,7 +292,8 @@ TxSetFrame::checkOrTrim(Application& app,
     ZoneScoped;
     LedgerTxn ltx(app.getLedgerTxnRoot());
 
-    std::unordered_map<AccountID, int64_t> accountFeeMap;
+    std::unordered_map<AccountID, int64_t, std::RandHasher<AccountID>>
+        accountFeeMap;
     auto accountTxMap = buildAccountTxQueues();
     for (auto& kv : accountTxMap)
     {

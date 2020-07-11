@@ -524,6 +524,7 @@ ApplicationImpl::shutdownMainIOContext()
 void
 ApplicationImpl::shutdownWorkScheduler()
 {
+    exit(0);
     if (mWorkScheduler)
     {
         mWorkScheduler->shutdown();

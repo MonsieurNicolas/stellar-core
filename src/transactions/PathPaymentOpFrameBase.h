@@ -35,7 +35,8 @@ class PathPaymentOpFrameBase : public OperationFrame
                            TransactionFrame& parentTx);
 
     void insertLedgerKeysToPrefetch(
-        std::unordered_set<LedgerKey>& keys) const override;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const override;
 
     virtual bool checkTransfer(int64_t maxSend, int64_t amountSend,
                                int64_t maxRecv, int64_t amountRecv) const = 0;

@@ -178,9 +178,9 @@ Config::Config() : NODE_SEED(SecretKey::random())
     QUORUM_INTERSECTION_CHECKER = true;
     DATABASE = SecretValue{"sqlite3://:memory:"};
 
-    ENTRY_CACHE_SIZE = 100000;
-    BEST_OFFERS_CACHE_SIZE = 64;
-    PREFETCH_BATCH_SIZE = 1000;
+    ENTRY_CACHE_SIZE = 60;
+    BEST_OFFERS_CACHE_SIZE = 32;
+    PREFETCH_BATCH_SIZE = 5;
 
 #ifdef BUILD_TESTS
     TEST_CASES_ENABLED = false;

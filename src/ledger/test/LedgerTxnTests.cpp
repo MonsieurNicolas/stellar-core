@@ -2349,7 +2349,8 @@ TEST_CASE("LedgerTxnRoot prefetch", "[ledgertxn]")
         cfg.ENTRY_CACHE_SIZE = 1000;
         cfg.PREFETCH_BATCH_SIZE = cfg.ENTRY_CACHE_SIZE / 10;
 
-        std::unordered_set<LedgerKey> keysToPrefetch;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>
+            keysToPrefetch;
         auto app = createTestApplication(clock, cfg);
         app->start();
         auto& root = app->getLedgerTxnRoot();
@@ -2366,7 +2367,7 @@ TEST_CASE("LedgerTxnRoot prefetch", "[ledgertxn]")
         SECTION("prefetch normally")
         {
             LedgerTxn ltx2(root);
-            std::unordered_set<LedgerKey> smallSet;
+            std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> smallSet;
             for (auto const& k : keysToPrefetch)
             {
                 smallSet.emplace(k);
@@ -2541,7 +2542,7 @@ TEST_CASE("Bulk load batch size benchmark", "[!hide][bulkbatchsizebench]")
     auto runTest = [&](Config::TestDbMode mode) {
         for (; floor <= ceiling; floor += 1000)
         {
-            std::unordered_set<LedgerKey> keys;
+            std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> keys;
             VirtualClock clock;
             Config cfg(getTestConfig(0, mode));
             cfg.PREFETCH_BATCH_SIZE = floor;

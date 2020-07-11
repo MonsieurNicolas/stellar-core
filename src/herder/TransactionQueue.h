@@ -150,13 +150,15 @@ class TransactionQueue
      * - AccountState.mTotalFees > 0
      * - !AccountState.mTransactions.empty()
      */
-    using AccountStates = std::unordered_map<AccountID, AccountState>;
+    using AccountStates =
+        std::unordered_map<AccountID, AccountState, std::RandHasher<AccountID>>;
 
     /**
      * Banned transactions are stored in deque of depth banDepth, so it is easy
      * to unban all transactions that were banned for long enough.
      */
-    using BannedTransactions = std::deque<std::unordered_set<Hash>>;
+    using BannedTransactions =
+        std::deque<std::unordered_set<Hash, std::RandHasher<Hash>>>;
 
     Application& mApp;
     int const mPendingDepth;

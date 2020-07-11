@@ -573,8 +573,9 @@ class BulkLoadAccountsOperation
     }
 
   public:
-    BulkLoadAccountsOperation(Database& db,
-                              std::unordered_set<LedgerKey> const& keys)
+    BulkLoadAccountsOperation(
+        Database& db,
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
         : mDb(db)
     {
         mAccountIDs.reserve(keys.size());
@@ -641,9 +642,10 @@ class BulkLoadAccountsOperation
 #endif
 };
 
-std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
+std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                   std::RandHasher<LedgerKey>>
 LedgerTxnRoot::Impl::bulkLoadAccounts(
-    std::unordered_set<LedgerKey> const& keys) const
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys) const
 {
     ZoneScoped;
     ZoneValue(static_cast<int64_t>(keys.size()));

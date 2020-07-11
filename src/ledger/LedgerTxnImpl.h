@@ -18,9 +18,11 @@ namespace stellar
 
 // Precondition: The keys associated with entries are unique and constitute a
 // subset of keys
-std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
-populateLoadedEntries(std::unordered_set<LedgerKey> const& keys,
-                      std::vector<LedgerEntry> const& entries);
+std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                   std::RandHasher<LedgerKey>>
+populateLoadedEntries(
+    std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys,
+    std::vector<LedgerEntry> const& entries);
 
 // A defensive heuristic to ensure prefetching stops if entry cache is filling
 // up.
@@ -152,7 +154,8 @@ class LedgerTxn::Impl
     class EntryIteratorImpl;
     class WorstBestOfferIteratorImpl;
 
-    typedef std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry>>
+    typedef std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry>,
+                               std::RandHasher<LedgerKey>>
         EntryMap;
 
     AbstractLedgerTxnParent& mParent;
@@ -160,7 +163,9 @@ class LedgerTxn::Impl
     std::unique_ptr<LedgerHeader> mHeader;
     std::shared_ptr<LedgerTxnHeader::Impl> mActiveHeader;
     EntryMap mEntry;
-    std::unordered_map<LedgerKey, std::shared_ptr<EntryImplBase>> mActive;
+    std::unordered_map<LedgerKey, std::shared_ptr<EntryImplBase>,
+                       std::RandHasher<LedgerKey>>
+        mActive;
     bool const mShouldUpdateLastModified;
     bool mIsSealed;
     LedgerTxnConsistency mConsistency;
@@ -428,7 +433,8 @@ class LedgerTxn::Impl
     // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified.
-    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers();
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
+    getAllOffers();
 
     // getBestOffer has the basic exception safety guarantee. If it throws an
     // exception, then
@@ -465,7 +471,7 @@ class LedgerTxn::Impl
     // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    std::unordered_map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset);
 
     // getHeader does not throw
@@ -562,7 +568,8 @@ class LedgerTxn::Impl
     // unsealHeader has the same exception safety guarantee as f
     void unsealHeader(LedgerTxn& self, std::function<void(LedgerHeader&)> f);
 
-    uint32_t prefetch(std::unordered_set<LedgerKey> const& keys);
+    uint32_t prefetch(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys);
 
     double getPrefetchHitRate() const;
 
@@ -641,7 +648,9 @@ class LedgerTxnRoot::Impl
         LoadType type;
     };
 
-    typedef RandomEvictionCache<LedgerKey, CacheEntry> EntryCache;
+    typedef RandomEvictionCache<LedgerKey, CacheEntry,
+                                std::RandHasher<LedgerKey>>
+        EntryCache;
 
     typedef AssetPair BestOffersCacheKey;
 
@@ -734,14 +743,26 @@ class LedgerTxnRoot::Impl
     BestOffersCacheEntryPtr getFromBestOffersCache(Asset const& buying,
                                                    Asset const& selling) const;
 
-    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
-    bulkLoadAccounts(std::unordered_set<LedgerKey> const& keys) const;
-    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
-    bulkLoadTrustLines(std::unordered_set<LedgerKey> const& keys) const;
-    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
-    bulkLoadOffers(std::unordered_set<LedgerKey> const& keys) const;
-    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>>
-    bulkLoadData(std::unordered_set<LedgerKey> const& keys) const;
+    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                       std::RandHasher<LedgerKey>>
+    bulkLoadAccounts(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        const;
+    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                       std::RandHasher<LedgerKey>>
+    bulkLoadTrustLines(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        const;
+    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                       std::RandHasher<LedgerKey>>
+    bulkLoadOffers(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        const;
+    std::unordered_map<LedgerKey, std::shared_ptr<LedgerEntry const>,
+                       std::RandHasher<LedgerKey>>
+    bulkLoadData(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys)
+        const;
 
   public:
     // Constructor has the strong exception safety guarantee
@@ -779,7 +800,8 @@ class LedgerTxnRoot::Impl
     // exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified.
-    std::unordered_map<LedgerKey, LedgerEntry> getAllOffers();
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
+    getAllOffers();
 
     // getBestOffer has the basic exception safety guarantee. If it throws an
     // exception, then
@@ -799,7 +821,7 @@ class LedgerTxnRoot::Impl
     // it throws an exception, then
     // - the prepared statement cache may be, but is not guaranteed to be,
     //   modified
-    std::unordered_map<LedgerKey, LedgerEntry>
+    std::unordered_map<LedgerKey, LedgerEntry, std::RandHasher<LedgerKey>>
     getOffersByAccountAndAsset(AccountID const& account, Asset const& asset);
 
     // getHeader does not throw
@@ -826,7 +848,8 @@ class LedgerTxnRoot::Impl
     // Prefetch some or all of given keys in batches. Note that no prefetching
     // could occur if the cache is at its fill ratio. Returns number of keys
     // prefetched.
-    uint32_t prefetch(std::unordered_set<LedgerKey> const& keys);
+    uint32_t prefetch(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> const& keys);
 
     double getPrefetchHitRate() const;
 };

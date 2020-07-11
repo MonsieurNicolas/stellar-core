@@ -175,9 +175,11 @@ class TransactionFrame : public TransactionFrameBase
                     uint64_t upperBoundCloseTimeOffset) override;
 
     void insertKeysForFeeProcessing(
-        std::unordered_set<LedgerKey>& keys) const override;
-    void
-    insertKeysForTxApply(std::unordered_set<LedgerKey>& keys) const override;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const override;
+    void insertKeysForTxApply(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const override;
 
     // collect fee, consume sequence number
     void processFeeSeqNum(AbstractLedgerTxn& ltx, int64_t baseFee) override;

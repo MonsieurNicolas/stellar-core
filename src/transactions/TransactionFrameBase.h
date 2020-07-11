@@ -50,10 +50,12 @@ class TransactionFrameBase
     virtual AccountID getFeeSourceID() const = 0;
     virtual AccountID getSourceID() const = 0;
 
-    virtual void
-    insertKeysForFeeProcessing(std::unordered_set<LedgerKey>& keys) const = 0;
-    virtual void
-    insertKeysForTxApply(std::unordered_set<LedgerKey>& keys) const = 0;
+    virtual void insertKeysForFeeProcessing(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const = 0;
+    virtual void insertKeysForTxApply(
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>>& keys)
+        const = 0;
 
     virtual void processFeeSeqNum(AbstractLedgerTxn& ltx, int64_t baseFee) = 0;
 

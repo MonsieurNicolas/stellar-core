@@ -856,7 +856,7 @@ LedgerManagerImpl::prefetchTxSourceIds(
     ZoneScoped;
     if (mApp.getConfig().PREFETCH_BATCH_SIZE > 0)
     {
-        std::unordered_set<LedgerKey> keys;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> keys;
         for (auto const& tx : txs)
         {
             tx->insertKeysForFeeProcessing(keys);
@@ -872,7 +872,7 @@ LedgerManagerImpl::prefetchTransactionData(
     ZoneScoped;
     if (mApp.getConfig().PREFETCH_BATCH_SIZE > 0)
     {
-        std::unordered_set<LedgerKey> keys;
+        std::unordered_set<LedgerKey, std::RandHasher<LedgerKey>> keys;
         for (auto const& tx : txs)
         {
             tx->insertKeysForTxApply(keys);

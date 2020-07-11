@@ -19,9 +19,10 @@ struct InferredQuorum
 {
     InferredQuorum();
     InferredQuorum(QuorumTracker::QuorumMap const& qmap);
-    std::unordered_map<Hash, SCPQuorumSet> mQsets;
-    std::unordered_map<PublicKey, std::vector<Hash>> mQsetHashes;
-    std::unordered_map<PublicKey, size_t> mPubKeys;
+    std::unordered_map<Hash, SCPQuorumSet, std::RandHasher<Hash>> mQsets;
+    std::unordered_map<PublicKey, std::vector<Hash>, std::RandHasher<PublicKey>>
+        mQsetHashes;
+    std::unordered_map<PublicKey, size_t, std::RandHasher<PublicKey>> mPubKeys;
     void noteSCPHistory(SCPHistoryEntry const& hist);
     void noteQset(SCPQuorumSet const& qset);
     void noteQsetHash(PublicKey const& pk, Hash const& hash);

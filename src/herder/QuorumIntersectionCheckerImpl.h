@@ -351,6 +351,7 @@
 // explanation ought to give you a good idea what you're looking at.
 
 #include "QuorumIntersectionChecker.h"
+#include "ledger/LedgerHashUtils.h"
 #include "main/Config.h"
 #include "util/BitSet.h"
 #include "xdr/Stellar-SCP.h"
@@ -505,7 +506,9 @@ class QuorumIntersectionCheckerImpl : public stellar::QuorumIntersectionChecker
     // These are the key state of the checker: the mapping from node public keys
     // to graph node numbers, and the graph of QBitSets itself.
     std::vector<stellar::PublicKey> mBitNumPubKeys;
-    std::unordered_map<stellar::PublicKey, size_t> mPubKeyBitNums;
+    std::unordered_map<stellar::PublicKey, size_t,
+                       std::RandHasher<stellar::PublicKey>>
+        mPubKeyBitNums;
     QGraph mGraph;
 
     // This is a temporary structure that's reused very often within the

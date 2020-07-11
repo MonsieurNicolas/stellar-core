@@ -258,7 +258,8 @@ static std::string
 txSetsToStr(SCPEnvelope const& envelope)
 {
     auto hashes = getTxSetHashes(envelope);
-    std::unordered_set<Hash> hashesSet(hashes.begin(), hashes.end());
+    std::unordered_set<Hash, std::RandHasher<Hash>> hashesSet(hashes.begin(),
+                                                              hashes.end());
     std::string res = "[";
     for (auto const& s : hashesSet)
     {

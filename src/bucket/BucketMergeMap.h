@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bucket/MergeKey.h"
+#include "ledger/LedgerHashUtils.h"
 #include "util/HashOfHash.h"
 #include "xdr/Stellar-types.h"
 #include <set>
@@ -25,12 +26,14 @@ class BucketMergeMap
     // not -- they just showed up from catchup or state reloading). Entries in
     // this map will be cleared when their _output_ is dropped from the owning
     // BucketManager's mSharedBuckets, typically due to being unreferenced.
-    std::unordered_map<MergeKey, Hash> mMergeKeyToOutput;
+    std::unordered_map<MergeKey, Hash, std::RandHasher<MergeKey>>
+        mMergeKeyToOutput;
 
     // Unfortunately to use this correctly in the bucket GC path, we also need
     // a different version of the same map, keyed by each input separately. And
     // since one input may be used in _many_ merges, it has to be a multimap.
-    std::unordered_multimap<Hash, Hash> mInputToOutput;
+    std::unordered_multimap<Hash, Hash, std::RandHasher<Hash>>
+        mInputToOutput;
 
     // Finally we need _another_ map, the opposite direction, to allow us to
     // erase entries from the previous two maps when we finally decide to drop
@@ -38,11 +41,13 @@ class BucketMergeMap
     //
     // This also has to be a multimap because the same output can be produced
     // by multiple MergeKeys.
-    std::unordered_multimap<Hash, MergeKey> mOutputToMergeKey;
+    std::unordered_multimap<Hash, MergeKey, std::RandHasher<Hash>>
+        mOutputToMergeKey;
 
   public:
     void recordMerge(MergeKey const& input, Hash const& output);
-    std::unordered_set<MergeKey> forgetAllMergesProducing(Hash const& output);
+    std::unordered_set<MergeKey, std::RandHasher<MergeKey>>
+    forgetAllMergesProducing(Hash const& output);
     bool findMergeFor(MergeKey const& input, Hash& output);
     void getOutputsUsingInput(Hash const& input, std::set<Hash>& outputs) const;
 };
