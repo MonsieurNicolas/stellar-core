@@ -5,6 +5,7 @@
 #include "herder/QuorumTracker.h"
 #include "scp/LocalNode.h"
 #include <Tracy.hpp>
+#include <deque>
 
 namespace stellar
 {
@@ -50,24 +51,27 @@ QuorumTracker::rebuild(std::function<SCPQuorumSetPtr(NodeID const&)> lookup)
 {
     ZoneScoped;
     mQuorum.clear();
-    std::set<NodeID> backlog;
-    backlog.insert(mLocalNodeID);
+    std::deque<NodeID> backlog;
+    backlog.push_back(mLocalNodeID);
     while (!backlog.empty())
     {
-        auto n = *backlog.begin();
-        backlog.erase(backlog.begin());
+        auto& n = *backlog.begin();
 
-        auto it = mQuorum.find(n);
-        if (it == mQuorum.end() || it->second == nullptr)
+        // `n` is in quorum
+        auto ii = mQuorum.emplace(n, nullptr);
+
+        if (ii.second || ii.first->second == nullptr)
         {
             auto qSet = lookup(n);
             if (qSet != nullptr)
             {
                 LocalNode::forAllNodes(
-                    *qSet, [&](NodeID const& id) { backlog.insert(id); });
+                    *qSet, [&](NodeID const& id) { backlog.emplace_back(id); });
+                expand(n, qSet);
             }
-            mQuorum[n] = qSet;
         }
+
+        backlog.pop_front();
     }
 }
 
