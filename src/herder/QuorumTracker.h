@@ -21,7 +21,16 @@ namespace stellar
 class QuorumTracker : public NonMovableOrCopyable
 {
   public:
-    using QuorumMap = std::unordered_map<NodeID, SCPQuorumSetPtr>;
+    struct NodeInfo
+    {
+        SCPQuorumSetPtr mQSet;
+        int mDistance; // distance to the local node
+
+        // closest validators from the local node's quorum set used to reach
+        // this node
+        std::set<NodeID> mClosestQSetValidators;
+    };
+    using QuorumMap = std::unordered_map<NodeID, NodeInfo>;
 
   private:
     NodeID const mLocalNodeID;
