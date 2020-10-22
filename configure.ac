@@ -337,6 +337,15 @@ AC_ARG_ENABLE(easylogging,
         [Disable easylogging]))
 AM_CONDITIONAL(USE_EASYLOGGING, [test x$enable_easylogging != xno])
 
+case "${host_os}" in
+    *darwin*)
+        # libunwind comes standard with the command-line tools on macos
+        ;;
+    *)
+        PKG_CHECK_MODULES(libunwind, libunwind)
+        ;;
+esac
+
 # Need this to pass through ccache for xdrpp, libsodium
 esc() {
     out=

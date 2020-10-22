@@ -3,6 +3,7 @@
 // of this distribution or at http://www.apache.org/licenses/LICENSE-2.0
 
 #include "GlobalChecks.h"
+#include "Backtrace.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -12,6 +13,25 @@
 #include <exception>
 #include <stdexcept>
 #include <thread>
+
+namespace
+{
+void
+printBacktrace()
+{
+    auto bt = getCurrentBacktrace();
+    if (!bt.empty())
+    {
+        std::fprintf(stderr, "backtrace:\n");
+        size_t i = 0;
+        for (auto const& f : bt)
+        {
+            std::fprintf(stderr, "  %4d: %s\n", i++, f.c_str());
+        }
+        std::fflush(stderr);
+    }
+}
+}
 
 namespace stellar
 {
@@ -38,6 +58,7 @@ printErrorAndAbort(const char* s1)
 {
     std::fprintf(stderr, "%s\n", s1);
     std::fflush(stderr);
+    printBacktrace();
     dbgAbort();
     std::abort();
 }
@@ -47,6 +68,7 @@ printErrorAndAbort(const char* s1, const char* s2)
 {
     std::fprintf(stderr, "%s%s\n", s1, s2);
     std::fflush(stderr);
+    printBacktrace();
     dbgAbort();
     std::abort();
 }
@@ -56,6 +78,7 @@ printAssertFailureAndAbort(const char* s1, const char* file, int line)
 {
     std::fprintf(stderr, "%s at %s:%d\n", s1, file, line);
     std::fflush(stderr);
+    printBacktrace();
     dbgAbort();
     std::abort();
 }
@@ -65,6 +88,7 @@ printAssertFailureAndThrow(const char* s1, const char* file, int line)
 {
     std::fprintf(stderr, "%s at %s:%d\n", s1, file, line);
     std::fflush(stderr);
+    printBacktrace();
     throw std::runtime_error(s1);
 }
 }
