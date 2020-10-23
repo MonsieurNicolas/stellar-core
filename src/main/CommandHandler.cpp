@@ -112,6 +112,7 @@ CommandHandler::CommandHandler(Application& app) : mApp(app)
     addRoute("testtx", &CommandHandler::testTx);
     addRoute("getsurveyresult", &CommandHandler::getSurveyResult);
     addRoute("surveytopology", &CommandHandler::surveyTopology);
+    mServer->addRoute("testCrash", std::bind(&CommandHandler::testCrash, this, _1, _2));
 #endif
 }
 
@@ -960,6 +961,34 @@ CommandHandler::testTx(std::string const& params, std::string& retStr)
                          "testtx?from=root&to=bob&amount=1000000000";
     }
     retStr = root.toStyledString();
+}
+
+void
+CommandHandler::testCrash(std::string const& params, std::string& retStr)
+{
+    ZoneScoped;
+    using namespace txtest;
+
+    std::map<std::string, std::string> retMap;
+    http::server::server::parseParams(params, retMap);
+    auto crashType = retMap.find("type");
+    if (crashType != retMap.end())
+    {
+        auto ct = crashType->second;
+        if (ct == "segv")
+        {
+            char *zero = nullptr;
+            *zero = 1;
+        }
+        else if (ct == "except")
+        {
+            throw 0;
+        }
+        else if (ct == "abort")
+        {
+            abort();
+        }
+    }
 }
 #endif
 }
