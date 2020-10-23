@@ -135,6 +135,8 @@ Logging::normalizePartition(std::string const& partition)
 
 #else // USE_EASYLOGGING defined
 
+#include "lib/util/easylogging++.cc"
+
 #include "main/Application.h"
 #include "util/Logging.h"
 #include "util/types.h"

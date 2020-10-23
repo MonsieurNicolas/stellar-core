@@ -20,6 +20,7 @@
 #include "util/Logging.h"
 #include "util/optional.h"
 #include "util/types.h"
+#include "util/GlobalChecks.h"
 
 #include "historywork/BatchDownloadWork.h"
 #include "historywork/WriteVerifiedCheckpointHashesWork.h"
@@ -447,6 +448,11 @@ CommandLine::Command::description() const
     return mDescription;
 }
 
+static void logCrash(int pid)
+{
+    printErrorAndAbort("signal!");
+}
+
 Config
 CommandLine::ConfigOption::getConfig(bool logToFile) const
 {
@@ -462,6 +468,8 @@ CommandLine::ConfigOption::getConfig(bool logToFile) const
 
     Logging::setFmt(KeyUtils::toShortString(config.NODE_SEED.getPublicKey()));
     Logging::setLogLevel(mLogLevel, nullptr);
+
+    el::Helpers::setCrashHandler(&logCrash);
 
     if (logToFile)
     {
