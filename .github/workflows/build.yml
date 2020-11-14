@@ -12,6 +12,7 @@ jobs:
       matrix:
         toolchain: [ "gcc", "clang"]
     steps:
+      - uses: ouzi-dev/commit-status-updater@v1.0.7
       - name: Cache
         uses: actions/cache@v2
         with:
@@ -20,6 +21,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.toolchain }}-cacheID
       - uses: actions/checkout@v2
         with:
+           # enough to find the junction point with the master branch
            fetch-depth: 200
            submodules: true
       - name: install core packages
@@ -52,3 +54,7 @@ jobs:
           fi
           echo Build with $CC and $CXX
           ./travis-build.sh --use-temp-db
+      - if: always()
+        uses: ouzi-dev/commit-status-updater@v1.0.7
+        with:
+          status: "${{ job.status }}"
