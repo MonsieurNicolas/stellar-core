@@ -175,14 +175,6 @@
 namespace stellar
 {
 
-// A heuristic number that is used to batch together groups of
-// LedgerEntries for bulk commit at the database interface layer. For sake
-// of mechanical sympathy with said batching, one should attempt to group
-// incoming work (if it is otherwise unbounded) into transactions of the
-// same number of entries. It does no semantic harm to pick a different
-// size, just fail to batch quite as evenly.
-static const size_t LEDGER_ENTRY_BATCH_COMMIT_SIZE = 0xfff;
-
 // If a LedgerTxn has had an eraseWithoutLoading call, the usual "exact"
 // level of consistency that a LedgerTxn maintains with the database will
 // be very slightly weakened: one or more "erase" events may be in
@@ -452,6 +444,15 @@ class AbstractLedgerTxnParent
     // than a (real or stub) root LedgerTxn.
     virtual uint32_t prefetch(UnorderedSet<LedgerKey> const& keys) = 0;
 
+    // A heuristic number that is used to batch together groups of
+    // LedgerEntries for bulk commit at the database interface layer. For sake
+    // of mechanical sympathy with said batching, one should attempt to group
+    // incoming work (if it is otherwise unbounded) into transactions of the
+    // same number of entries. It does no semantic harm to pick a different
+    // size, just fail to batch quite as evenly.
+    virtual size_t getBatchSize() const = 0;
+    virtual void setBatchSize(size_t size) = 0;
+
 #ifdef BUILD_TESTS
     virtual void resetForFuzzer() = 0;
 #endif // BUILD_TESTS
@@ -710,6 +711,9 @@ class LedgerTxn : public AbstractLedgerTxn
     double getPrefetchHitRate() const override;
     uint32_t prefetch(UnorderedSet<LedgerKey> const& keys) override;
 
+    size_t getBatchSize() const override;
+    void setBatchSize(size_t size) override;
+
     bool hasSponsorshipEntry() const override;
 
 #ifdef BUILD_TESTS
@@ -793,6 +797,9 @@ class LedgerTxnRoot : public AbstractLedgerTxnParent
 
     uint32_t prefetch(UnorderedSet<LedgerKey> const& keys) override;
     double getPrefetchHitRate() const override;
+
+    size_t getBatchSize() const override;
+    void setBatchSize(size_t size) override;
 
 #ifdef BEST_OFFER_DEBUGGING
     bool bestOfferDebuggingEnabled() const override;

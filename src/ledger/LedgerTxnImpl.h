@@ -597,6 +597,9 @@ class LedgerTxn::Impl
 
     double getPrefetchHitRate() const;
 
+    size_t getBatchSize() const;
+    void setBatchSize(size_t size);
+
     // hasSponsorshipEntry has the strong exception safety guarantee
     bool hasSponsorshipEntry() const;
 
@@ -716,6 +719,9 @@ class LedgerTxnRoot::Impl
     size_t mBulkLoadBatchSize;
     std::unique_ptr<soci::transaction> mTransaction;
     AbstractLedgerTxn* mChild;
+
+    // initialize with a best guess at a batch size
+    size_t mBatchSize{0xFFF};
 
 #ifdef BEST_OFFER_DEBUGGING
     bool const mBestOfferDebuggingEnabled;
@@ -906,6 +912,9 @@ class LedgerTxnRoot::Impl
     uint32_t prefetch(UnorderedSet<LedgerKey> const& keys);
 
     double getPrefetchHitRate() const;
+
+    size_t getBatchSize() const;
+    void setBatchSize(size_t s);
 
 #ifdef BEST_OFFER_DEBUGGING
     bool bestOfferDebuggingEnabled() const;

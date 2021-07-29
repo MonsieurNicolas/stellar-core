@@ -149,6 +149,18 @@ InMemoryLedgerTxnRoot::prefetch(UnorderedSet<LedgerKey> const& keys)
     return 0;
 }
 
+size_t
+InMemoryLedgerTxnRoot::getBatchSize() const
+{
+    // in memory default (mostly driven by memory bandwidth)
+    return 0xFFFF;
+}
+
+void
+InMemoryLedgerTxnRoot::setBatchSize(size_t)
+{
+}
+
 #ifdef BUILD_TESTS
 void
 InMemoryLedgerTxnRoot::resetForFuzzer()

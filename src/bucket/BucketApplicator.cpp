@@ -73,6 +73,7 @@ BucketApplicator::advance(BucketApplicator::Counters& counters)
     size_t count = 0;
 
     auto& root = mApp.getLedgerTxnRoot();
+    auto batchSize = root.getBatchSize();
     LedgerTxn ltx(root, false);
     for (; mBucketIter; ++mBucketIter)
     {
@@ -92,7 +93,7 @@ BucketApplicator::advance(BucketApplicator::Counters& counters)
                 ltx.eraseWithoutLoading(e.deadEntry());
             }
 
-            if ((++count > LEDGER_ENTRY_BATCH_COMMIT_SIZE))
+            if ((++count > batchSize))
             {
                 break;
             }

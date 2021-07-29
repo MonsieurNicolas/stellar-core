@@ -1743,6 +1743,30 @@ LedgerTxn::Impl::prefetch(UnorderedSet<LedgerKey> const& keys)
     return mParent.prefetch(keys);
 }
 
+size_t
+LedgerTxn::getBatchSize() const
+{
+    return getImpl()->getBatchSize();
+}
+
+size_t
+LedgerTxn::Impl::getBatchSize() const
+{
+    return mParent.getBatchSize();
+}
+
+void
+LedgerTxn::setBatchSize(size_t size)
+{
+    getImpl()->setBatchSize(size);
+}
+
+void
+LedgerTxn::Impl::setBatchSize(size_t size)
+{
+    mParent.setBatchSize(size);
+}
+
 LedgerTxn::Impl::EntryMap
 LedgerTxn::Impl::maybeUpdateLastModified() const
 {
@@ -2358,8 +2382,7 @@ LedgerTxnRoot::Impl::commitChild(EntryIterator iter, LedgerTxnConsistency cons)
             bleca.accumulate(iter);
             ++iter;
             ++counter;
-            size_t bufferThreshold =
-                (bool)iter ? LEDGER_ENTRY_BATCH_COMMIT_SIZE : 0;
+            size_t bufferThreshold = (bool)iter ? mBatchSize : 0;
             bulkApply(bleca, bufferThreshold, cons);
         }
         // FIXME: there is no medida historgram for this presently,
@@ -2642,6 +2665,30 @@ LedgerTxnRoot::Impl::getPrefetchHitRate() const
     }
     return static_cast<double>(mPrefetchHits) /
            (mPrefetchMisses + mPrefetchHits);
+}
+
+size_t
+LedgerTxnRoot::getBatchSize() const
+{
+    return mImpl->getBatchSize();
+}
+
+size_t
+LedgerTxnRoot::Impl::getBatchSize() const
+{
+    return mBatchSize;
+}
+
+void
+LedgerTxnRoot::setBatchSize(size_t s)
+{
+    return mImpl->setBatchSize(s);
+}
+
+void
+LedgerTxnRoot::Impl::setBatchSize(size_t s)
+{
+    mBatchSize = s;
 }
 
 UnorderedMap<LedgerKey, LedgerEntry>
