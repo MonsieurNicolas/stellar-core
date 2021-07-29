@@ -9,11 +9,15 @@
 #include "ledger/LedgerTxnEntry.h"
 #include "main/Application.h"
 #include "util/Logging.h"
+#include "util/numeric.h"
 #include "util/types.h"
 #include <fmt/format.h>
 
 namespace stellar
 {
+
+static constexpr std::chrono::microseconds APPLICATOR_PERIOD_DURATION =
+    std::chrono::seconds(10);
 
 BucketApplicator::BucketApplicator(Application& app,
                                    uint32_t maxProtocolVersion,
@@ -72,6 +76,7 @@ BucketApplicator::advance(BucketApplicator::Counters& counters)
 {
     size_t count = 0;
 
+    auto start = mApp.getClock().system_now();
     auto& root = mApp.getLedgerTxnRoot();
     auto batchSize = root.getBatchSize();
     LedgerTxn ltx(root, false);
@@ -102,6 +107,62 @@ BucketApplicator::advance(BucketApplicator::Counters& counters)
     ltx.commit();
 
     mCount += count;
+
+    mPeriodCount += count;
+    auto elapsed = mApp.getClock().system_now() - start;
+    mPeriodDuration += elapsed;
+
+    if (mPeriodDuration >= APPLICATOR_PERIOD_DURATION)
+    {
+        // normalize to period duration
+        uint64 countPerPeriod =
+            bigDivide(mPeriodCount, APPLICATOR_PERIOD_DURATION.count(),
+                      std::chrono::duration_cast<std::chrono::microseconds>(
+                          mPeriodDuration)
+                          .count(),
+                      Rounding::ROUND_UP);
+        CLOG_INFO(Bucket,"Rate is {} @ {}", countPerPeriod, batchSize);
+        if (mLastCountPerPeriod != 0)
+        {
+            if (countPerPeriod < mLastCountPerPeriod)
+            {
+                // whatever we were doing doesn't work, flip
+                mIncreaseBatch = !mIncreaseBatch;
+            }
+            if (mIncreaseBatch)
+            {
+                batchSize *= 2;
+            }
+            else
+            {
+                batchSize /= 2;
+            }
+            if (batchSize >= 256)
+            {
+                CLOG_INFO(Bucket,
+                          "Changing {} batch size to {} (last period {} ms)", mIncreaseBatch?"increase":"decrease",
+                          batchSize,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(
+                              mPeriodDuration)
+                              .count());
+                root.setBatchSize(batchSize);
+            }
+            else {
+                CLOG_INFO(Bucket,
+                    "COULD NOT change batch size to {} (last period {} ms)",
+                    batchSize,
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        mPeriodDuration)
+                    .count());
+
+            }
+        }
+        mLastCountPerPeriod = countPerPeriod;
+        // start a new period
+        mPeriodCount = 0;
+        mPeriodDuration = mPeriodDuration.zero();
+    }
+
     return count;
 }
 

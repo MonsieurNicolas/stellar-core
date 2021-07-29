@@ -27,6 +27,14 @@ class BucketApplicator
     size_t mCount{0};
     std::function<bool(LedgerEntryType)> mEntryTypeFilter;
 
+    // current period timing and count
+    std::chrono::system_clock::duration mPeriodDuration{0};
+    size_t mPeriodCount{0};
+    uint64 mLastCountPerPeriod{0};
+
+    // direction of the batch adjustment
+    bool mIncreaseBatch{true};
+
   public:
     class Counters
     {
