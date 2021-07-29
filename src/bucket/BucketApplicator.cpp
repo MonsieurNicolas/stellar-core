@@ -93,7 +93,7 @@ BucketApplicator::advance(BucketApplicator::Counters& counters)
                 ltx.eraseWithoutLoading(e.deadEntry());
             }
 
-            if ((++count > batchSize))
+            if ((++count >= batchSize))
             {
                 break;
             }
