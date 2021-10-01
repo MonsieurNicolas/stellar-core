@@ -85,7 +85,7 @@ bigDivide(uint64_t& result, uint128_t a, uint64_t B, Rounding rounding)
     //         = (UINT64_MAX * UINT64_MAX + 2 * UINT64_MAX) / UINT64_MAX
     //         = UINT64_MAX + 2
     // which would have overflowed uint64_t anyway.
-    uint128_t const UINT128_MAX = ~uint128_0;
+    uint128_t const UINT128_MAX(~0ul, ~0ul);
     if ((rounding == ROUND_UP) && (a > UINT128_MAX - (b - 1u)))
     {
         return false;

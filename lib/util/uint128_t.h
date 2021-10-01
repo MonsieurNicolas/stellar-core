@@ -115,7 +115,7 @@ class uint128_t{
 
         template <typename T, typename = typename std::enable_if<std::is_integral<T>::value &&
                                                                  std::is_unsigned<T>::value, T>::type >
-        uint128_t(const T & rhs)
+        constexpr uint128_t(const T & rhs)
 #ifdef __BIG_ENDIAN__
             : UPPER(0), LOWER(rhs)
 #endif
@@ -129,7 +129,7 @@ class uint128_t{
                                                                               std::is_unsigned<S>::value &&
                                                                               std::is_unsigned<T>::value
                                                                               , void>::type>
-        uint128_t(const S & upper_rhs, const T & lower_rhs)
+        constexpr uint128_t(const S & upper_rhs, const T & lower_rhs)
 #ifdef __BIG_ENDIAN__
             : UPPER(upper_rhs), LOWER(lower_rhs)
 #endif
@@ -216,6 +216,25 @@ class uint128_t{
         }
 
         uint128_t & operator<<=(const uint128_t & rhs);
+
+        // shorthand for <<= 1;
+        uint128_t& shiftLL1();
+
+        // checks bit at position pos
+        bool checkBit(uint8_t pos) const
+        {
+            uint64_t v;
+            if (pos > 63)
+            {
+                pos -= 64;
+                v = UPPER;
+            }
+            else
+            {
+                v = LOWER;
+            }
+            return (v >> pos) & 1;
+        }
 
         template <typename T, typename = typename std::enable_if<std::is_integral<T>::value && std::is_unsigned<T>::value, T>::type >
         uint128_t & operator<<=(const T & rhs){
@@ -395,10 +414,6 @@ class uint128_t{
         // Get string representation of value
         std::string str(uint8_t base = 10, const unsigned int & len = 0) const;
 };
-
-// useful values
-UINT128_T_EXTERN extern const uint128_t uint128_0;
-UINT128_T_EXTERN extern const uint128_t uint128_1;
 
 // lhs type T as first arguemnt
 // If the output is not a bool, casts to type T
