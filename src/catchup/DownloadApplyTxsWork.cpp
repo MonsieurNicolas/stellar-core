@@ -3,6 +3,8 @@
 // of this distribution or at http://www.apache.org/licenses/LICENSE-2.0
 
 #include "catchup/DownloadApplyTxsWork.h"
+#include "bucket/BucketList.h"
+#include "bucket/BucketManager.h"
 #include "catchup/ApplyCheckpointWork.h"
 #include "history/FileTransferInfo.h"
 #include "history/HistoryManager.h"
@@ -10,6 +12,8 @@
 #include "ledger/LedgerManager.h"
 #include "work/ConditionalWork.h"
 #include "work/WorkSequence.h"
+#include "work/WorkWithCallback.h"
+
 #include <Tracy.hpp>
 #include <fmt/format.h>
 
@@ -76,12 +80,18 @@ DownloadApplyTxsWork::yieldMoreWork()
 
     std::vector<std::shared_ptr<BasicWork>> seq{getAndUnzip};
 
+    auto waitForMerges = [](Application& app) {
+        auto& bl = app.getBucketManager().getBucketList();
+        bl.resolveAnyReadyFutures();
+        return bl.futuresAllResolved();
+    };
+
     if (mLastYieldedWork)
     {
         auto prev = mLastYieldedWork;
         bool pqFellBehind = false;
-        auto predicate = [prev, pqFellBehind, waitForPublish = mWaitForPublish](
-                             Application& app) mutable {
+        auto predicate = [prev, pqFellBehind, waitForPublish = mWaitForPublish,
+                          waitForMerges](Application& app) mutable {
             if (!prev)
             {
                 throw std::runtime_error("Download and apply txs: related Work "
@@ -110,14 +120,15 @@ DownloadApplyTxsWork::yieldMoreWork()
                 }
                 res = !pqFellBehind;
             }
-            return res;
+            return res && waitForMerges(app);
         };
         seq.push_back(std::make_shared<ConditionalWork>(
             mApp, "conditional-" + apply->getName(), predicate, apply));
     }
     else
     {
-        seq.push_back(apply);
+        seq.push_back(std::make_shared<ConditionalWork>(
+            mApp, "wait-merges" + apply->getName(), waitForMerges, apply));
     }
 
     auto nextWork = std::make_shared<WorkSequence>(
