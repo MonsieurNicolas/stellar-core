@@ -1,8 +1,27 @@
 #include "uint128_t.h"
 #include <cstring>
 
-const uint128_t uint128_0(0u);
-const uint128_t uint128_1(1u);
+#ifdef WIN32
+#include <intrin.h>
+int __inline __builtin_clzl(unsigned long v)
+{
+    unsigned long index = 0;
+
+    _BitScanReverse( &index, v);
+    return 31 - index;
+}
+
+int __inline __builtin_clzll(unsigned long long v)
+{
+    unsigned long index = 0;
+
+    _BitScanReverse64( &index, v);
+    return 63 - index;
+}
+#endif
+
+constexpr uint128_t uint128_0(0u);
+constexpr uint128_t uint128_1(1u);
 
 uint128_t::uint128_t(std::string const& s) {
     init(s.c_str());
@@ -259,6 +278,12 @@ uint128_t & uint128_t::operator-=(const uint128_t & rhs){
 }
 
 uint128_t uint128_t::operator*(const uint128_t & rhs) const{
+#ifdef WIN32
+uint64_t newUpper;
+uint64_t newLower = _umul128(LOWER, rhs.LOWER, &newUpper);
+newUpper += LOWER * rhs.UPPER + UPPER * rhs.LOWER;
+return uint128_t(newUpper, newLower);
+#else
     // split values into 4 32-bit parts
     uint64_t top[4] = {UPPER >> 32, UPPER & 0xffffffff, LOWER >> 32, LOWER & 0xffffffff};
     uint64_t bottom[4] = {rhs.UPPER >> 32, rhs.UPPER & 0xffffffff, rhs.LOWER >> 32, rhs.LOWER & 0xffffffff};
@@ -302,6 +327,7 @@ uint128_t uint128_t::operator*(const uint128_t & rhs) const{
 
     // combine components
     return uint128_t((first32 << 32) | second32, (third32 << 32) | fourth32);
+#endif
 }
 
 uint128_t & uint128_t::operator*=(const uint128_t & rhs){
@@ -325,6 +351,17 @@ void uint128_t::export_bits(std::vector<uint8_t> &ret) const {
     ConvertToVector(ret, const_cast<const uint64_t&>(LOWER));
 }
 
+uint128_t& uint128_t::shiftLL1()
+{
+#ifdef WIN32
+    UPPER = __shiftleft128(LOWER, UPPER, 1);
+    LOWER <<= 1;
+#else
+    *this <<= uint128_1;
+#endif
+    return *this;
+}
+
 std::pair <uint128_t, uint128_t> uint128_t::divmod(const uint128_t & lhs, const uint128_t & rhs) const{
     // Save some calculations /////////////////////
     if (rhs == uint128_0){
@@ -342,10 +379,10 @@ std::pair <uint128_t, uint128_t> uint128_t::divmod(const uint128_t & lhs, const 
 
     std::pair <uint128_t, uint128_t> qr (uint128_0, uint128_0);
     for(uint8_t x = lhs.bits(); x > 0; x--){
-        qr.first  <<= uint128_1;
-        qr.second <<= uint128_1;
+        qr.first.shiftLL1();
+        qr.second.shiftLL1();
 
-        if ((lhs >> (x - 1u)) & 1u){
+        if (lhs.checkBit(x - 1u)){
             ++qr.second;
         }
 
@@ -414,19 +451,14 @@ const uint64_t & uint128_t::lower() const{
 uint8_t uint128_t::bits() const{
     uint8_t out = 0;
     if (UPPER){
-        out = 64;
-        uint64_t up = UPPER;
-        while (up){
-            up >>= 1;
-            out++;
-        }
+        out = 64 + 64 - static_cast<uint8_t>(__builtin_clzll(UPPER));
     }
-    else{
-        uint64_t low = LOWER;
-        while (low){
-            low >>= 1;
-            out++;
-        }
+    else if (LOWER){
+        out = 64 - static_cast<uint8_t>(__builtin_clzll(LOWER));
+    }
+    else
+    {
+        out = 0;
     }
     return out;
 }
