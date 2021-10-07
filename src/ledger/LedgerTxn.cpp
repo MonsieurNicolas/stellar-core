@@ -540,8 +540,8 @@ LedgerTxn::Impl::erase(InternalLedgerKey const& key)
     throwIfSealed();
     throwIfChild();
 
-    auto newest = getNewestVersion(key);
-    if (!newest)
+    auto newest = getNewestVersionCur(key);
+    if (!newest.first)
     {
         throw std::runtime_error("Key does not exist");
     }
@@ -549,7 +549,8 @@ LedgerTxn::Impl::erase(InternalLedgerKey const& key)
     auto activeIter = mActive.find(key);
     bool isActive = activeIter != mActive.end();
 
-    updateEntry(key, nullptr, nullptr, false);
+    updateEntry(key, (newest.second != mEntry.end()) ? &newest.second : nullptr,
+                nullptr, false);
     // Note: Cannot throw after this point because the entry will not be
     // deactivated in that case
 
@@ -1241,6 +1242,18 @@ LedgerTxn::Impl::getNewestVersion(InternalLedgerKey const& key) const
     return mParent.getNewestVersion(key);
 }
 
+std::pair<std::shared_ptr<InternalLedgerEntry const>,
+          LedgerTxn::Impl::EntryMap::iterator>
+LedgerTxn::Impl::getNewestVersionCur(InternalLedgerKey const& key)
+{
+    auto iter = mEntry.find(key);
+    if (iter != mEntry.end())
+    {
+        return std::make_pair(iter->second, iter);
+    }
+    return std::make_pair(mParent.getNewestVersion(key), iter);
+}
+
 UnorderedMap<LedgerKey, LedgerEntry>
 LedgerTxn::getOffersByAccountAndAsset(AccountID const& account,
                                       Asset const& asset)
@@ -1362,13 +1375,24 @@ LedgerTxn::Impl::load(LedgerTxn& self, InternalLedgerKey const& key)
         throw std::runtime_error("Key is active");
     }
 
-    auto newest = getNewestVersion(key);
-    if (!newest)
+    auto newest = getNewestVersionCur(key);
+    if (!newest.first)
     {
         return {};
     }
 
-    auto current = std::make_shared<InternalLedgerEntry>(*newest);
+    std::shared_ptr<InternalLedgerEntry> current;
+    EntryMap::iterator* kHint;
+    if (newest.second == mEntry.end())
+    {
+        current = std::make_shared<InternalLedgerEntry>(*(newest.first));
+        kHint = nullptr;
+    }
+    else
+    {
+        current = newest.second->second;
+        kHint = &newest.second;
+    }
     auto impl = LedgerTxnEntry::makeSharedImpl(self, *current);
 
     // Set the key to active before constructing the LedgerTxnEntry, as this
@@ -1381,7 +1405,7 @@ LedgerTxn::Impl::load(LedgerTxn& self, InternalLedgerKey const& key)
     // If this throws, the order book will not be modified because of the strong
     // exception safety guarantee. Furthermore, ltxe will be destructed leading
     // to key being deactivated. This will leave LedgerTxn unmodified.
-    updateEntry(key, nullptr, current, /* effectiveActive */ true);
+    updateEntry(key, kHint, current, /* effectiveActive */ true);
     return ltxe;
 }
 

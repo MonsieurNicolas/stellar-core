@@ -513,6 +513,9 @@ class LedgerTxn::Impl
     std::shared_ptr<InternalLedgerEntry const>
     getNewestVersion(InternalLedgerKey const& key) const;
 
+    std::pair<std::shared_ptr<InternalLedgerEntry const>, EntryMap::iterator>
+    getNewestVersionCur(InternalLedgerKey const& key);
+
     // load has the basic exception safety guarantee. If it throws an exception,
     // then
     // - the prepared statement cache may be, but is not guaranteed to be,
