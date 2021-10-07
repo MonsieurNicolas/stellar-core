@@ -785,12 +785,18 @@ createEntryWithPossibleSponsorship(AbstractLedgerTxn& ltx,
     return res;
 }
 
+bool
+isSponsored(LedgerEntry& le)
+{
+    return le.ext.v() == 1 && le.ext.v1().sponsoringID;
+}
+
 void
 removeEntryWithPossibleSponsorship(AbstractLedgerTxn& ltx,
                                    LedgerTxnHeader const& header,
                                    LedgerEntry& le, LedgerTxnEntry& acc)
 {
-    if (le.ext.v() == 1 && le.ext.v1().sponsoringID)
+    if (isSponsored(le))
     {
         // claimable balances are not subentries, so there's no sponsored
         // account

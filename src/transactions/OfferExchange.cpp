@@ -1110,12 +1110,6 @@ crossOfferV10(AbstractLedgerTxn& ltx, LedgerTxnEntry& sellingWheatOffer,
     AccountID accountBID = offer.sellerID;
     int64_t offerID = offer.offerID;
 
-    if (!stellar::loadAccountWithoutRecord(ltx, accountBID))
-    {
-        throw std::runtime_error(
-            "invalid database state: offer must have matching account");
-    }
-
     // Remove liabilities associated with the offer being crossed. Will throw if
     // either asset is unauthorized
     releaseLiabilities(ltx, header, sellingWheatOffer);
@@ -1126,6 +1120,11 @@ crossOfferV10(AbstractLedgerTxn& ltx, LedgerTxnEntry& sellingWheatOffer,
     if (wheat.type() == ASSET_TYPE_NATIVE || sheep.type() == ASSET_TYPE_NATIVE)
     {
         accountB = stellar::loadAccount(ltx, accountBID);
+        if (!accountB)
+        {
+            throw std::runtime_error(
+                "invalid database state: offer must have matching account");
+        }
     }
     auto sheepLineAccountB = loadTrustLineIfNotNative(ltx, accountBID, sheep);
     auto wheatLineAccountB = loadTrustLineIfNotNative(ltx, accountBID, wheat);
@@ -1196,33 +1195,62 @@ crossOfferV10(AbstractLedgerTxn& ltx, LedgerTxnEntry& sellingWheatOffer,
         offer.amount = 0;
     }
 
+    auto version = header.current().ledgerVersion;
     auto res = (offer.amount == 0) ? CrossOfferResult::eOfferTaken
                                    : CrossOfferResult::eOfferPartial;
     {
-        LedgerTxn ltxInner(ltx);
-        header = ltxInner.loadHeader();
-        sellingWheatOffer = loadOffer(ltxInner, accountBID, offerID);
+        std::unique_ptr<LedgerTxn> ltxInner;
+        if (isSponsored(sellingWheatOffer.current()))
+        {
+            ltxInner = std::make_unique<LedgerTxn>(ltx);
+            header = ltxInner->loadHeader();
+            sellingWheatOffer = loadOffer(*ltxInner, accountBID, offerID);
+        }
+        auto& ltxToUpdate = ltxInner ? *ltxInner : ltx;
         if (res == CrossOfferResult::eOfferTaken)
         {
-            auto account = loadAccount(ltxInner, accountBID);
+            if (ltxInner || !accountB)
+            {
+                accountB = loadAccount(ltxToUpdate, accountBID);
+                if (!accountB)
+                {
+                    throw std::runtime_error("invalid database state: offer "
+                                             "must have matching account");
+                }
+            }
             removeEntryWithPossibleSponsorship(
-                ltxInner, header, sellingWheatOffer.current(), account);
+                ltxToUpdate, header, sellingWheatOffer.current(), accountB);
             sellingWheatOffer.erase();
         }
         else
         {
-            acquireLiabilities(ltxInner, header, sellingWheatOffer);
+            if (accountB)
+            {
+                accountB.deactivate();
+            }
+            if (sheepLineAccountB)
+            {
+                sheepLineAccountB.deactivate();
+            }
+            if (wheatLineAccountB)
+            {
+                wheatLineAccountB.deactivate();
+            }
+            acquireLiabilities(ltxToUpdate, header, sellingWheatOffer);
         }
-        ltxInner.commit();
+        if (ltxInner)
+        {
+            ltxInner->commit();
+        }
     }
 
     // Note: The previous block creates a nested LedgerTxn so all entries are
     // deactivated at this point. Specifically, you cannot use sellingWheatOffer
     // or offer (which is a reference) since it is not active (and may have been
     // erased) at this point.
-    offerTrail.emplace_back(
-        makeClaimAtom(ltx.loadHeader().current().ledgerVersion, accountBID,
-                      offerID, wheat, numWheatReceived, sheep, numSheepSend));
+    offerTrail.emplace_back(makeClaimAtom(version, accountBID, offerID, wheat,
+                                          numWheatReceived, sheep,
+                                          numSheepSend));
     return res;
 }
 

@@ -50,6 +50,8 @@ canTransferEntrySponsorship(LedgerHeader const& lh, LedgerEntry const& le,
                             LedgerEntry const& oldSponsoringAcc,
                             LedgerEntry const& newSponsoringAcc);
 
+bool isSponsored(LedgerEntry& le);
+
 void establishEntrySponsorship(LedgerEntry& le, LedgerEntry& sponsoringAcc,
                                LedgerEntry* sponsoredAcc);
 void removeEntrySponsorship(LedgerEntry& le, LedgerEntry& sponsoringAcc,
