@@ -341,7 +341,7 @@ LedgerTxn::Impl::commitChild(EntryIterator iter,
     {
         for (; (bool)iter; ++iter)
         {
-            updateEntry(iter.key(), iter.entryPtr(),
+            updateEntry(iter.key(), nullptr, iter.entryPtr(),
                         /* effectiveActive */ false);
         }
 
@@ -462,7 +462,7 @@ LedgerTxn::Impl::create(LedgerTxn& self, InternalLedgerEntry const& entry)
     mActive.emplace(key, toEntryImplBase(impl));
     LedgerTxnEntry ltxe(impl);
 
-    updateEntry(key, current, /* effectiveActive */ true);
+    updateEntry(key, nullptr, current, /* effectiveActive */ true);
     return ltxe;
 }
 
@@ -486,7 +486,7 @@ LedgerTxn::Impl::createOrUpdateWithoutLoading(LedgerTxn& self,
         throw std::runtime_error("Key is already active");
     }
 
-    updateEntry(key, std::make_shared<InternalLedgerEntry>(entry),
+    updateEntry(key, nullptr, std::make_shared<InternalLedgerEntry>(entry),
                 /* effectiveActive */ false);
 }
 
@@ -549,7 +549,7 @@ LedgerTxn::Impl::erase(InternalLedgerKey const& key)
     auto activeIter = mActive.find(key);
     bool isActive = activeIter != mActive.end();
 
-    updateEntry(key, nullptr, false);
+    updateEntry(key, nullptr, nullptr, false);
     // Note: Cannot throw after this point because the entry will not be
     // deactivated in that case
 
@@ -576,7 +576,7 @@ LedgerTxn::Impl::eraseWithoutLoading(InternalLedgerKey const& key)
     auto activeIter = mActive.find(key);
     bool isActive = activeIter != mActive.end();
 
-    updateEntry(key, nullptr, false, false);
+    updateEntry(key, nullptr, nullptr, false, false);
     // Note: Cannot throw after this point because the entry will not be
     // deactivated in that case
 
@@ -1381,7 +1381,7 @@ LedgerTxn::Impl::load(LedgerTxn& self, InternalLedgerKey const& key)
     // If this throws, the order book will not be modified because of the strong
     // exception safety guarantee. Furthermore, ltxe will be destructed leading
     // to key being deactivated. This will leave LedgerTxn unmodified.
-    updateEntry(key, current, /* effectiveActive */ true);
+    updateEntry(key, nullptr, current, /* effectiveActive */ true);
     return ltxe;
 }
 
@@ -1880,7 +1880,7 @@ LedgerTxn::Impl::updateEntryIfRecorded(InternalLedgerKey const& key,
     // book. Therefore we only updateEntry if key is in mEntry.
     if (entryIter != mEntry.end())
     {
-        updateEntry(key, entryIter->second, effectiveActive);
+        updateEntry(key, &entryIter, entryIter->second, effectiveActive);
     }
 }
 
@@ -1889,20 +1889,22 @@ LedgerTxn::Impl::updateEntry(InternalLedgerKey const& key,
                              std::shared_ptr<InternalLedgerEntry> lePtr)
 {
     bool effectiveActive = mActive.find(key) != mActive.end();
-    updateEntry(key, lePtr, effectiveActive);
+    updateEntry(key, nullptr, lePtr, effectiveActive);
 }
 
 void
 LedgerTxn::Impl::updateEntry(InternalLedgerKey const& key,
+                             EntryMap::iterator* keyHint,
                              std::shared_ptr<InternalLedgerEntry> lePtr,
                              bool effectiveActive)
 {
     bool eraseIfNull = !lePtr && !mParent.getNewestVersion(key);
-    updateEntry(key, lePtr, effectiveActive, eraseIfNull);
+    updateEntry(key, keyHint, lePtr, effectiveActive, eraseIfNull);
 }
 
 void
 LedgerTxn::Impl::updateEntry(InternalLedgerKey const& key,
+                             EntryMap::iterator* keyHint,
                              std::shared_ptr<InternalLedgerEntry> lePtr,
                              bool effectiveActive, bool eraseIfNull) noexcept
 {
@@ -1912,14 +1914,28 @@ LedgerTxn::Impl::updateEntry(InternalLedgerKey const& key,
     // - UnorderedMap<...>::operator[] has the strong exception safety
     //   guarantee
     // - std::shared_ptr<...>::operator= does not throw
-    auto recordEntry = [&]() {
+    auto recordEntry = [&](EntryMap::iterator* hint) {
         if (eraseIfNull)
         {
-            mEntry.erase(key);
+            if (hint)
+            {
+                mEntry.erase(*hint);
+            }
+            else
+            {
+                mEntry.erase(key);
+            }
         }
         else
         {
-            mEntry[key] = lePtr;
+            if (hint)
+            {
+                (*hint)->second = lePtr;
+            }
+            else
+            {
+                mEntry[key] = lePtr;
+            }
         }
     };
 
@@ -1928,17 +1944,24 @@ LedgerTxn::Impl::updateEntry(InternalLedgerKey const& key,
     if (key.type() != InternalLedgerEntryType::LEDGER_ENTRY ||
         key.ledgerKey().type() != OFFER)
     {
-        recordEntry();
+        recordEntry(keyHint);
         return;
     }
 
-    auto iter = mEntry.find(key);
-    if (iter != mEntry.end() && iter->second)
+    auto iter = keyHint ? *keyHint : mEntry.find(key);
+    if (iter != mEntry.end())
     {
-        auto mob = findInOrderBook(iter->second->ledgerEntry());
-        if (mob.first != nullptr)
+        if (!keyHint)
         {
-            mob.first->erase(mob.second);
+            keyHint = &iter;
+        }
+        if (iter->second)
+        {
+            auto mob = findInOrderBook(iter->second->ledgerEntry());
+            if (mob.first != nullptr)
+            {
+                mob.first->erase(mob.second);
+            }
         }
     }
 
@@ -1951,7 +1974,7 @@ LedgerTxn::Impl::updateEntry(InternalLedgerKey const& key,
         auto& ob = mMultiOrderBook[oe.buying][oe.selling];
         ob.emplace(OfferDescriptor{oe.price, oe.offerID}, key.ledgerKey());
     }
-    recordEntry();
+    recordEntry(keyHint);
 }
 
 static bool
