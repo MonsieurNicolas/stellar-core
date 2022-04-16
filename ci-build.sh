@@ -16,9 +16,6 @@ BASE_CONFIG_FLAGS="--enable-asan --enable-extrachecks"
 
 export CFLAGS="-O2 -g1"
 
-exit 0
-
-
 while [[ -n "$1" ]]; do
     COMMAND="$1"
     shift
@@ -50,6 +47,7 @@ while [[ -n "$1" ]]; do
             export TEST_SPEC='[tx]'
             export STELLAR_CORE_TEST_PARAMS="--ll fatal -r simple --all-versions --rng-seed 12345 --record-test-tx-meta ${PWD}/test-tx-meta-baseline/${PROTOCOL}"
             BASE_CONFIG_FLAGS=""
+            echo "test" >> "${PWD}/test-tx-meta-baseline-${PROTOCOL}/AllowTrustTests.json"
             export CFLAGS="-O2 -g0"
             ;;
     "--protocol")
@@ -78,6 +76,8 @@ while [[ -n "$1" ]]; do
     esac
 
 done
+
+exit 0
 
 NPROCS=$(getconf _NPROCESSORS_ONLN)
 
