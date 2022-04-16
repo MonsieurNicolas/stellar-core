@@ -76,6 +76,11 @@ while [[ -n "$1" ]]; do
 
 done
 
+if [[ "$BASE_CONFIG_FLAGS" != "" ]] ; then
+    sleep 120
+fi
+exit 0
+
 NPROCS=$(getconf _NPROCESSORS_ONLN)
 
 echo "Found $NPROCS processors"
