@@ -12,6 +12,9 @@ WITH_TESTS=1
 export TEMP_POSTGRES=0
 
 PROTOCOL_CONFIG=""
+BASE_CONFIG_FLAGS="--enable-asan --enable-extrachecks"
+
+export CFLAGS="-O2 -g1"
 
 while [[ -n "$1" ]]; do
     COMMAND="$1"
@@ -32,7 +35,20 @@ while [[ -n "$1" ]]; do
                 exit 1
             fi
             export TEST_SPEC='[tx]'
-            export STELLAR_CORE_TEST_PARAMS="--ll fatal -r simple --all-versions --rng-seed 12345 --check-test-tx-meta ${PWD}/test-tx-meta-baseline-${PROTOCOL}"
+            export STELLAR_CORE_TEST_PARAMS="--ll fatal -r simple --all-versions --rng-seed 12345 --check-test-tx-meta ${PWD}/test-tx-meta-baseline/${PROTOCOL}"
+            BASE_CONFIG_FLAGS=""
+            export CFLAGS="-O2 -g0"
+            ;;
+    "--record-test-tx-meta")
+            if [[ -z "${PROTOCOL}" ]]; then
+                echo 'must specify --protocol before --generate-test-tx-meta'
+                exit 1
+            fi
+            export TEST_SPEC='[tx]'
+            export STELLAR_CORE_TEST_PARAMS="--ll fatal -r simple --all-versions --rng-seed 12345 --record-test-tx-meta ${PWD}/test-tx-meta-baseline/${PROTOCOL}"
+            BASE_CONFIG_FLAGS=""
+            R="${PWD}/test-tx-meta-baseline/${PROTOCOL}"
+            export CFLAGS="-O2 -g0"
             ;;
     "--protocol")
             PROTOCOL="$1"
@@ -61,12 +77,13 @@ while [[ -n "$1" ]]; do
 
 done
 
-echo $TRAVIS_PULL_REQUEST
-
 NPROCS=$(getconf _NPROCESSORS_ONLN)
 
 echo "Found $NPROCS processors"
 date
+
+echo "pipo\npof" >> "${R}/AllowTrustTests.json"
+exit 0
 
 # Short-circuit transient 'auto-initialization' builds
 git fetch origin master
@@ -107,9 +124,8 @@ elif test $CXX = 'g++'; then
     g++ -v
 fi
 
-config_flags="--enable-asan --enable-extrachecks --enable-ccache --enable-sdfprefs ${PROTOCOL_CONFIG}"
-export CFLAGS="-O2 -g1"
-export CXXFLAGS="-w -O2 -g1"
+config_flags="${BASE_CONFIG_FLAGS} --enable-ccache --enable-sdfprefs ${PROTOCOL_CONFIG}"
+export CXXFLAGS="-w ${CFLAGS}"
 
 # quarantine_size_mb / malloc_context_size : reduce memory usage to avoid
 # crashing in tests that churn a lot of memory
@@ -140,6 +156,7 @@ ccache -p
 
 ccache -s
 date
+
 time ./autogen.sh
 time ./configure $config_flags
 make format
