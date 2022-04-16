@@ -60,6 +60,7 @@ jobs:
       - name: install dependencies
         run: sudo apt-get -y install postgresql git build-essential pkg-config autoconf automake libtool bison flex libpq-dev parallel libunwind-dev
       - name: Build
+        if: ${{ ! ( github.event_name == 'pull_request' && matrix.scenario == '--check-test-tx-meta' ) }}
         run: |
           if test "${{ matrix.toolchain }}" = "gcc" ; then
             export CC='gcc'
