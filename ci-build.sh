@@ -18,6 +18,7 @@ export CFLAGS="-O2 -g1"
 
 exit 0
 
+
 while [[ -n "$1" ]]; do
     COMMAND="$1"
     shift
