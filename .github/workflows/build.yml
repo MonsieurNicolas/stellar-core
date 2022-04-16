@@ -16,8 +16,8 @@ jobs:
         protocol: ["current", "next"]
         scenario: ["", "--check-test-tx-meta"]
         exclude:
-          toolchain: gcc
-          scenario: '--check-test-tx-meta'
+          - toolchain: gcc
+            scenario: '--check-test-tx-meta'
     steps:
       - name: Compute cache key
         # this step works around a limitation in actions/cache
