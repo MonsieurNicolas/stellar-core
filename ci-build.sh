@@ -77,6 +77,7 @@ while [[ -n "$1" ]]; do
 
 done
 
+
 if [[ "$BASE_CONFIG_FLAGS" != "" ]] ; then
     sleep 120
 fi
