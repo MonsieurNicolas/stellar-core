@@ -8,7 +8,7 @@
 <a href="https://github.com/stellar/stellar-core/actions"><img alt="Build Status" src="https://github.com/stellar/stellar-core/workflows/.github/workflows/build.yml/badge.svg?branch=auto" /></a>
 </p>
 
-Stellar-core is a replicated state machine that maintains a local copy of a cryptographic ledger and processes transactions against it, in consensus with a set of peers.
+Stellar-core A is a replicated state machine that maintains a local copy of a cryptographic ledger and processes transactions against it, in consensus with a set of peers.
 It implements the [Stellar Consensus Protocol](https://github.com/stellar/stellar-core/blob/master/src/scp/readme.md), a _federated_ consensus protocol.
 It is written in C++17 and runs on Linux, OSX and Windows.
 Learn more by reading the [overview document](https://github.com/stellar/stellar-core/blob/master/docs/readme.md).
