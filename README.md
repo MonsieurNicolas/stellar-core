@@ -15,7 +15,7 @@ Learn more by reading the [overview document](https://github.com/stellar/stellar
 
 # Documentation
 
-Documentation of the code's layout and abstractions, as well as for the
+Documentation A of the code's layout and abstractions, as well as for the
 functionality available, can be found in
 [`./docs`](https://github.com/stellar/stellar-core/tree/master/docs).
 
