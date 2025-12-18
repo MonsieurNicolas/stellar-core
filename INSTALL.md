@@ -218,6 +218,71 @@ See [INSTALL-Windows.md](INSTALL-Windows.md)
 - Type `make check` to run tests.
 - Type `make install` to install.
 
+## Building with CMake
+
+As an alternative to the autotools-based build system, stellar-core can also be built using CMake. This does not require autotools to be installed.
+
+### CMake Build Dependencies
+
+The CMake build has the same dependencies as the autotools build, except:
+- `autoconf`, `automake`, and `libtool` are **not** required
+- `cmake` >= 3.16 is required
+
+### CMake Quick Start
+
+```bash
+git clone https://github.com/stellar/stellar-core.git
+cd stellar-core
+./autogen-cmake.sh
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
+make -j$(nproc)
+```
+
+### CMake Build Options
+
+The following CMake options are available (use `-D<OPTION>=ON/OFF`):
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `USE_POSTGRES` | Enable PostgreSQL support | ON |
+| `BUILD_TESTS` | Build test suite | ON |
+| `USE_SPDLOG` | Enable spdlog logging | ON |
+| `USE_TRACY` | Enable Tracy profiler | OFF |
+| `ENABLE_NEXT_PROTOCOL_VERSION` | Enable next protocol version (UNSAFE) | OFF |
+| `USE_LIBUNWIND` | Enable libunwind for backtraces | ON |
+| `ENABLE_ASAN` | Enable Address Sanitizer | OFF |
+| `ENABLE_TSAN` | Enable Thread Sanitizer | OFF |
+| `ENABLE_MSAN` | Enable Memory Sanitizer | OFF |
+| `ENABLE_UBSAN` | Enable Undefined Behavior Sanitizer | OFF |
+| `ENABLE_CCACHE` | Use ccache for compilation | OFF |
+| `UNIFIED_RUST` | Build rust as single cargo library (for sanitizers) | OFF |
+
+### CMake Build Examples
+
+**Release build:**
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
+```
+
+**Debug build without tests:**
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=OFF
+```
+
+**Build with libc++:**
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_C_COMPILER=clang-20 \
+    -DCMAKE_CXX_COMPILER=clang++-20 \
+    -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+```
+
+**Build without PostgreSQL:**
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DUSE_POSTGRES=OFF
+```
+
 ## Building with clang and libc++
 
 On some systems, building with `libc++`, [LLVM's version of the standard library](https://libcxx.llvm.org/) can be done instead of `libstdc++` (typically used on Linux).
